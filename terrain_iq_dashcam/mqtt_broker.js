@@ -18,13 +18,28 @@ httpServer.listen(WS_PORT, function () {
   console.log(`Web clients can connect to: ws://localhost:${WS_PORT}`);
 });
 
-// Log client connections
+// Log client connections with timestamp
 aedes.on('client', function (client) {
-  console.log(`Client connected: ${client.id}`);
+  const timestamp = new Date().toISOString();
+  console.log(`\n✅ [${timestamp}] Client connected: ${client.id}`);
 });
 
+// Log client disconnections with timestamp
 aedes.on('clientDisconnect', function (client) {
-  console.log(`Client disconnected: ${client.id}`);
+  const timestamp = new Date().toISOString();
+  console.log(`\n❌ [${timestamp}] Client disconnected: ${client.id}`);
+});
+
+// Log connection errors
+aedes.on('clientError', function (client, err) {
+  const timestamp = new Date().toISOString();
+  console.log(`\n⚠️  [${timestamp}] Client error (${client.id}): ${err.message}`);
+});
+
+// Log keepalive timeouts
+aedes.on('keepaliveTimeout', function (client) {
+  const timestamp = new Date().toISOString();
+  console.log(`\n⏱️  [${timestamp}] Keepalive timeout: ${client.id}`);
 });
 
 // Log published messages with payload

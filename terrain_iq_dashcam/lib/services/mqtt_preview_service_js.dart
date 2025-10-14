@@ -67,14 +67,18 @@ class MqttPreviewServiceJs extends ChangeNotifier {
       // Note: All event handlers need to accept optional parameters even if unused
       _client!.callMethod('on', ['connect', js.allowInterop(([dynamic connack]) => _onConnected())]);
       _client!.callMethod('on', ['close', js.allowInterop(([dynamic _]) => _onDisconnected())]);
+      _client!.callMethod('on', ['offline', js.allowInterop(() => _onOffline())]);
+      _client!.callMethod('on', ['reconnect', js.allowInterop(() => _onReconnect())]);
       _client!.callMethod('on', ['error', js.allowInterop((dynamic error) {
-        debugPrint('MQTT: Error - $error');
+        final timestamp = DateTime.now().toIso8601String();
+        debugPrint('❌ MQTT [$timestamp]: Error - $error');
       })]);
       _client!.callMethod('on', ['message', js.allowInterop((String topic, dynamic message, [dynamic packet]) {
         _onMessage(topic, message);
       })]);
 
-      debugPrint('MQTT: Connection initiated');
+      final timestamp = DateTime.now().toIso8601String();
+      debugPrint('🔌 MQTT [$timestamp]: Connection initiated to $_brokerUrl');
     } catch (e, stackTrace) {
       debugPrint('MQTT: Connection exception - $e');
       debugPrint('MQTT: Stack trace: $stackTrace');
@@ -84,7 +88,8 @@ class MqttPreviewServiceJs extends ChangeNotifier {
   }
 
   void _onConnected() {
-    debugPrint('MQTT: Connected to broker');
+    final timestamp = DateTime.now().toIso8601String();
+    debugPrint('✅ MQTT [$timestamp]: Connected to broker ($_clientId)');
     _isConnected = true;
 
     // Subscribe to preview topics
@@ -95,7 +100,7 @@ class MqttPreviewServiceJs extends ChangeNotifier {
     _client!.callMethod('subscribe', [_topicPreviewRecording, js.JsObject.jsify({'qos': 1})]);
     _client!.callMethod('subscribe', [_topicPreviewOrientation, js.JsObject.jsify({'qos': 1})]);
 
-    debugPrint('MQTT: Subscribed to all topics');
+    debugPrint('📬 MQTT: Subscribed to 6 preview topics');
 
     // Publish initial status
     _publishStatus();
@@ -104,10 +109,23 @@ class MqttPreviewServiceJs extends ChangeNotifier {
   }
 
   void _onDisconnected() {
-    debugPrint('MQTT: Disconnected from broker');
+    final timestamp = DateTime.now().toIso8601String();
+    debugPrint('❌ MQTT [$timestamp]: Disconnected from broker ($_clientId)');
     _isConnected = false;
     _previewEnabled = false;
     notifyListeners();
+  }
+
+  void _onOffline() {
+    final timestamp = DateTime.now().toIso8601String();
+    debugPrint('📴 MQTT [$timestamp]: Client offline ($_clientId)');
+    _isConnected = false;
+    notifyListeners();
+  }
+
+  void _onReconnect() {
+    final timestamp = DateTime.now().toIso8601String();
+    debugPrint('🔄 MQTT [$timestamp]: Attempting reconnection ($_clientId)');
   }
 
   void _onMessage(String topic, dynamic messageBytes) {

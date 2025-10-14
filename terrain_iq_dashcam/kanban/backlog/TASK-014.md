@@ -4,11 +4,11 @@ title: Create Flutter Web Test Suite with Playwright
 type: feature
 priority: medium
 assignee: agent
-validation_status: pending
+validation_status: in_progress
 created_at: 2025-10-14T08:21:17.172111
-updated_at: 2025-10-14T08:21:17.172111
+updated_at: 2025-10-14T18:02:00.000000
 completed_at: None
-tags: []
+tags: [mqtt, logging, web-server]
 ---
 
 # Create Flutter Web Test Suite with Playwright
@@ -40,9 +40,9 @@ Enable browser-based testing of Flutter app without needing physical devices. Al
 
 ## Subtasks
 
-- [ ] Configure Flutter for web platform
-- [ ] Build web version of app
-- [ ] Setup local web server for testing
+- [x] Configure Flutter for web platform
+- [x] Build web version of app
+- [x] Setup local web server for testing (headless mode on port 3201)
 - [ ] Install Playwright (@playwright/test)
 - [ ] Create test/e2e/web/ directory
 - [ ] Configure Playwright browsers
@@ -92,3 +92,38 @@ Enable browser-based testing of Flutter app without needing physical devices. Al
 - Consider Percy or similar for visual testing
 - Add accessibility testing (axe-core)
 - Test responsive design (mobile/tablet/desktop viewports)
+
+## Progress (2025-10-14)
+
+### ✅ Completed
+1. **Enhanced MQTT Broker Logging**
+   - Added timestamps to all connection/disconnection events
+   - Added error logging (clientError, keepaliveTimeout)
+   - Logs now show: ✅ connections, ❌ disconnections, ⚠️ errors, ⏱️ timeouts
+
+2. **Enhanced Flutter MQTT Client Logging**
+   - Added timestamps to all MQTT events
+   - Added offline/reconnect event handlers
+   - Improved error messages with client ID tracking
+   - Logs now show: 🔌 connecting, ✅ connected, ❌ disconnected, 📴 offline, 🔄 reconnecting
+
+3. **Flutter Web Server Mode**
+   - Updated start_flutter.sh to use headless web-server mode
+   - No browser popup - access only via http://localhost:3201 or simulator iframe
+   - Eliminates duplicate MQTT connections from multiple browser windows
+   - Allows controlled testing environment
+
+4. **MQTT Connection Test Script**
+   - Created test_mqtt_connection.sh for monitoring connection stability
+   - Tests run for 30 seconds and report connection status
+   - Verified: 8 clients connected and stable ✅
+
+### Issues Fixed
+- **Multiple MQTT Clients**: Headless mode prevents duplicate connections
+- **Poor Visibility**: Enhanced logging shows exactly when/why disconnections occur
+- **No Timestamps**: All events now timestamped for debugging
+
+### Next Steps
+- Create Playwright E2E test suite
+- Add visual MQTT status indicator in HTML simulator
+- Implement automated connection stability tests in CI/CD
