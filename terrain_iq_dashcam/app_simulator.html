@@ -1,0 +1,2412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TerrainIQ Dashcam - Interactive App Simulator</title>
+    <!-- MQTT.js for WebSocket MQTT connection -->
+    <script src="https://unpkg.com/mqtt@5.3.4/dist/mqtt.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1E88E5 0%, #1976D2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 48px;
+            font-weight: 300;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 550px;
+            gap: 0;
+            height: calc(100vh - 200px);
+            min-height: 900px;
+            transition: all 0.5s ease;
+        }
+
+        .main-content.landscape-mode {
+            grid-template-columns: 1fr;
+            grid-template-rows: 1fr 1fr;
+        }
+
+        .main-content.examples-view {
+            grid-template-columns: 1fr;
+        }
+
+        .main-content.examples-view .simulator-section {
+            display: none;
+        }
+
+        .main-content.examples-view .left-panel {
+            border-right: none;
+        }
+
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            border-right: 2px solid #e0e0e0;
+            transition: all 0.5s ease;
+            overflow: hidden;
+            max-height: calc(100vh - 200px);
+        }
+
+        .main-content.landscape-mode .left-panel {
+            border-right: none;
+            border-top: 2px solid #e0e0e0;
+            order: 2;
+        }
+
+        .main-content.landscape-mode .simulator-section {
+            order: 1;
+        }
+
+        .tab-buttons {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 20px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-button:hover {
+            background: rgba(30, 136, 229, 0.05);
+        }
+
+        .tab-button.active {
+            color: #1E88E5;
+            border-bottom-color: #1E88E5;
+            background: white;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 30px;
+            overflow-y: auto;
+            flex: 1;
+            max-height: calc(100vh - 320px);
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        #examplesContent {
+            overflow-y: scroll;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .requirements-section h2 {
+            color: #1E88E5;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .requirements-section h3 {
+            color: #333;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .requirements-section ul {
+            margin-left: 20px;
+            line-height: 1.8;
+        }
+
+        .requirements-section li {
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .feature-badge {
+            display: inline-block;
+            background: #1E88E5;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+
+        .simulator-section {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+
+        .phone-simulator {
+            background: #000;
+            border-radius: 40px;
+            padding: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            position: relative;
+            transition: all 0.5s ease;
+            max-width: 100%;
+        }
+
+        .main-content.landscape-mode .phone-simulator {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .phone-notch {
+            background: #000;
+            height: 30px;
+            width: 150px;
+            border-radius: 0 0 20px 20px;
+            margin: 0 auto;
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            transition: all 0.5s ease;
+        }
+
+        .main-content.landscape-mode .phone-notch {
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            border-radius: 0 20px 20px 0;
+            width: 30px;
+            height: 150px;
+        }
+
+        .phone-screen {
+            background: #1976D2;
+            border-radius: 30px;
+            overflow: hidden;
+            position: relative;
+            height: 700px;
+            width: 350px;
+            transition: all 0.5s ease;
+            margin: 0 auto;
+        }
+
+        .main-content.landscape-mode .phone-screen {
+            height: 350px;
+            width: 700px;
+        }
+
+        .app-view {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 60px 30px 30px;
+            position: relative;
+        }
+
+        .hazard-hud {
+            text-align: center;
+            color: white;
+            width: 100%;
+        }
+
+        .status-bar {
+            position: absolute;
+            top: 50px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .status-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 4px 8px;
+            border-radius: 8px;
+            margin: 2px;
+        }
+
+        .hazard-icon {
+            font-size: 100px;
+            margin-bottom: 20px;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .hazard-type {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .hazard-distance {
+            font-size: 80px;
+            font-weight: 800;
+            margin: 20px 0;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        .hazard-direction {
+            font-size: 60px;
+            margin-top: 20px;
+        }
+
+        .next-hazard-indicator {
+            position: absolute;
+            top: 50px;
+            right: 20px;
+            background: rgba(0,0,0,0.4);
+            padding: 12px;
+            border-radius: 15px;
+            font-size: 14px;
+            text-align: center;
+            color: white;
+        }
+
+        .all-clear {
+            font-size: 48px;
+            font-weight: 300;
+        }
+
+        .camera-view {
+            display: none;
+            background: #000;
+            height: 100%;
+            position: relative;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .camera-view.active {
+            display: flex;
+        }
+
+        .camera-pip {
+            position: absolute;
+            bottom: 80px;
+            right: 20px;
+            width: 150px;
+            height: 100px;
+            background: linear-gradient(135deg, #434343 0%, #000000 100%);
+            border-radius: 15px;
+            border: 3px solid rgba(255,255,255,0.3);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #999;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        .camera-pip.visible {
+            display: flex;
+        }
+
+        .hazard-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            display: none;
+        }
+
+        .hazard-overlay.visible {
+            display: block;
+        }
+
+        .overlay-warning {
+            position: absolute;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(211, 47, 47, 0.95);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            min-width: 250px;
+        }
+
+        .overlay-warning.medium {
+            background: rgba(255, 111, 0, 0.95);
+        }
+
+        .overlay-warning.low {
+            background: rgba(251, 192, 45, 0.95);
+        }
+
+        .overlay-warning-type {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .overlay-warning-distance {
+            font-size: 36px;
+            font-weight: 800;
+        }
+
+        .camera-placeholder {
+            width: 100%;
+            height: 100%;
+            background: #000;
+            background-image: url('assets/images/road_view.jpg');
+            background-size: contain;
+            background-position: center;
+            background-repeat: no-repeat;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255,255,255,0.3);
+            font-size: 24px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .camera-overlay {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 14px;
+        }
+
+        .rec-indicator {
+            position: absolute;
+            top: 50px;
+            right: 20px;
+            background: #D32F2F;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: none;
+            animation: pulse 1.5s infinite;
+        }
+
+        .rec-indicator.active {
+            display: block;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .speed-display {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 20px;
+            font-size: 32px;
+            font-weight: bold;
+        }
+
+        .page-indicators {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+        }
+
+        .page-dot {
+            width: 8px;
+            height: 8px;
+            background: rgba(255,255,255,0.4);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .page-dot.active {
+            background: white;
+            width: 24px;
+            border-radius: 4px;
+        }
+
+        /* Docked Video Layouts */
+        .phone-screen.docked-layout.portrait .app-view {
+            flex-direction: column;
+            padding: 50px 15px 30px;
+            gap: 0;
+        }
+
+        .phone-screen.docked-layout.portrait .camera-pip {
+            position: relative;
+            width: 100%;
+            height: 200px;
+            bottom: auto;
+            right: auto;
+            margin-bottom: 20px;
+            border-radius: 15px;
+        }
+
+        .phone-screen.docked-layout.landscape .app-view {
+            flex-direction: row;
+            padding: 50px 20px 30px;
+            gap: 20px;
+            align-items: stretch;
+        }
+
+        .phone-screen.docked-layout.landscape .hazard-hud {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .phone-screen.docked-layout.landscape .camera-pip {
+            position: relative;
+            flex: 1;
+            width: auto;
+            height: auto;
+            bottom: auto;
+            right: auto;
+            border-radius: 15px;
+        }
+
+        .controls-panel {
+            padding: 0;
+        }
+
+        .controls-panel h3 {
+            margin-bottom: 20px;
+            color: #1E88E5;
+            font-size: 20px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .control-value {
+            color: #1E88E5;
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: #ddd;
+            border-radius: 5px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #1E88E5;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #1E88E5;
+            cursor: pointer;
+            border-radius: 50%;
+            border: none;
+        }
+
+        .toggle-button {
+            background: #ddd;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            width: 100%;
+            font-size: 14px;
+        }
+
+        .toggle-button.active {
+            background: #1E88E5;
+            color: white;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .preset-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .preset-button:hover {
+            transform: translateY(-2px);
+        }
+
+        .annotations {
+            position: absolute;
+            pointer-events: none;
+        }
+
+        .annotation {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            border: 2px solid #1E88E5;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            max-width: 150px;
+            z-index: 100;
+            display: none;
+        }
+
+        .annotation.visible {
+            display: block;
+        }
+
+        .annotation::before {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-style: solid;
+        }
+
+        .annotation.top::before {
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 10px 8px 0 8px;
+            border-color: #1E88E5 transparent transparent transparent;
+        }
+
+        .annotation.right::before {
+            left: -10px;
+            top: 50%;
+            transform: translateY(-50%);
+            border-width: 8px 10px 8px 0;
+            border-color: transparent #1E88E5 transparent transparent;
+        }
+
+        .annotation.left::before {
+            right: -10px;
+            top: 50%;
+            transform: translateY(-50%);
+            border-width: 8px 0 8px 10px;
+            border-color: transparent transparent transparent #1E88E5;
+        }
+
+        .help-text {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-size: 13px;
+            border-left: 4px solid #1E88E5;
+        }
+
+        /* Examples/Scenarios Styles */
+        .scenario-list {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            padding-bottom: 30px;
+        }
+
+        .scenario-item {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 30px;
+            padding: 25px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid #1E88E5;
+            align-items: center;
+        }
+
+        .scenario-previews-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .screen-nav-buttons {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .screen-nav-btn {
+            background: #f0f0f0;
+            border: 2px solid #ddd;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #666;
+        }
+
+        .screen-nav-btn.active {
+            background: #1E88E5;
+            color: white;
+            border-color: #1E88E5;
+        }
+
+        .screen-nav-btn:hover:not(.active) {
+            background: #e0e0e0;
+        }
+
+        .preview-screens-wrapper {
+            display: flex;
+            gap: 15px;
+        }
+
+        .scenario-description h3 {
+            color: #1E88E5;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .scenario-description p {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .try-it-button {
+            background: linear-gradient(135deg, #1E88E5 0%, #1976D2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            margin-top: 10px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .try-it-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(30, 136, 229, 0.4);
+        }
+
+        .scenario-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .meta-tag {
+            background: #f0f0f0;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            color: #555;
+        }
+
+        .scenario-preview {
+            background: #000;
+            border-radius: 20px;
+            padding: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            position: relative;
+            height: 490px;
+            width: 245px;
+            flex-shrink: 0;
+        }
+
+        .scenario-preview.landscape {
+            height: 245px;
+            width: 490px;
+        }
+
+        .scenario-preview-screen {
+            background: #1976D2;
+            border-radius: 15px;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            position: relative;
+            font-size: 10px;
+        }
+
+        .scenario-preview-screen .status-bar {
+            font-size: 9px;
+            padding: 0 12px;
+            top: 35px;
+        }
+
+        .scenario-preview-screen .status-badge {
+            padding: 3px 6px;
+            font-size: 8px;
+        }
+
+        .scenario-preview-screen .hazard-icon {
+            font-size: 70px;
+        }
+
+        .scenario-preview-screen .hazard-type {
+            font-size: 16px;
+        }
+
+        .scenario-preview-screen .hazard-distance {
+            font-size: 56px;
+        }
+
+        .scenario-preview-screen .all-clear {
+            font-size: 32px;
+        }
+
+        .scenario-preview-screen .next-hazard-indicator {
+            font-size: 11px;
+            padding: 8px;
+            top: 35px;
+        }
+
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .simulator-section {
+                position: relative;
+                top: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>TerrainIQ Dashcam</h1>
+            <p>Interactive App Simulator & Requirements Breakdown</p>
+        </header>
+
+        <div class="main-content">
+            <div class="left-panel">
+                <div class="tab-buttons">
+                    <button class="tab-button active" id="controlsTab">Controls</button>
+                    <button class="tab-button" id="requirementsTab">Requirements</button>
+                    <button class="tab-button" id="examplesTab">Examples</button>
+                </div>
+
+                <!-- Controls Tab Content -->
+                <div class="tab-content active" id="controlsContent">
+                    <div class="controls-panel">
+                        <h3>Simulation Controls</h3>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>Distance to Hazard</span>
+                                <span class="control-value"><span id="distanceValue">450</span>m</span>
+                            </div>
+                            <input type="range" id="distanceSlider" min="0" max="1000" value="450" step="10">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>Hazard Severity</span>
+                                <span class="control-value"><span id="severityValue">5</span>/10</span>
+                            </div>
+                            <input type="range" id="severitySlider" min="1" max="10" value="5">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>Vehicle Speed</span>
+                                <span class="control-value"><span id="speedValue">65</span> km/h</span>
+                            </div>
+                            <input type="range" id="speedSlider" min="0" max="120" value="65" step="5">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>Next Hazard Distance</span>
+                                <span class="control-value"><span id="nextDistanceValue">345</span>m</span>
+                            </div>
+                            <input type="range" id="nextDistanceSlider" min="100" max="1000" value="345" step="10">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>Hazard Type</span>
+                            </div>
+                            <select id="hazardTypeSelect" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+                                <option value="POTHOLE AHEAD">Pothole</option>
+                                <option value="SHARP TURN">Sharp Turn</option>
+                                <option value="DEBRIS ON ROAD">Debris</option>
+                                <option value="ROUGH SURFACE">Rough Surface</option>
+                                <option value="ACCIDENT ZONE">Accident Zone</option>
+                            </select>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>Auto-Record Mode</span>
+                            </div>
+                            <button class="toggle-button active" id="autoRecordToggle">ON</button>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>Manual Recording</span>
+                            </div>
+                            <div class="button-group">
+                                <button class="toggle-button active" id="manualRecordToggle">REC</button>
+                                <button class="toggle-button" id="stopRecordButton">STOP</button>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>Motion Detection</span>
+                            </div>
+                            <button class="toggle-button active" id="motionToggle">MOVING</button>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>Device Orientation</span>
+                            </div>
+                            <div class="button-group">
+                                <button class="toggle-button active" id="portraitButton">PORTRAIT</button>
+                                <button class="toggle-button" id="landscapeButton">LANDSCAPE</button>
+                            </div>
+                        </div>
+
+                        <div class="control-group" style="border-top: 2px solid #1E88E5; padding-top: 20px; margin-top: 20px;">
+                            <div class="control-label">
+                                <span>Simulator Mode</span>
+                            </div>
+                            <div class="button-group">
+                                <button class="toggle-button active" id="htmlModeButton">HTML Simulator</button>
+                                <button class="toggle-button" id="flutterModeButton">Flutter App</button>
+                            </div>
+                            <div id="mqttStatus" style="margin-top: 10px; padding: 8px; border-radius: 6px; font-size: 12px; background: #f0f0f0; color: #666;">
+                                <span id="mqttStatusText">MQTT: Not connected</span>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>View Mode</span>
+                            </div>
+                            <select id="viewStateSelect" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+                                <option value="1">Hazard HUD Only</option>
+                                <option value="2">HUD with Camera PIP</option>
+                                <option value="3">Camera Full Screen with Overlay</option>
+                            </select>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>Video Layout (Page 2)</span>
+                            </div>
+                            <div class="button-group">
+                                <button class="toggle-button active" id="pipLayoutButton">Picture-in-Picture</button>
+                                <button class="toggle-button" id="dockedLayoutButton">Docked</button>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>Show Annotations</span>
+                            </div>
+                            <button class="toggle-button" id="annotationsToggle">OFF</button>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-label">
+                                <span>Quick Presets</span>
+                            </div>
+                            <div class="button-group">
+                                <button class="preset-button" id="presetSafe">All Clear</button>
+                                <button class="preset-button" id="presetWarning">Warning</button>
+                                <button class="preset-button" id="presetDanger">Danger!</button>
+                                <button class="preset-button" id="presetInside">Inside Zone</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Requirements Tab Content -->
+                <div class="tab-content" id="requirementsContent">
+                    <div class="requirements-section">
+                        <h2>App Requirements Overview</h2>
+
+                        <h3>Core Features</h3>
+                <div>
+                    <span class="feature-badge">Hazard Warnings</span>
+                    <span class="feature-badge">Dashcam Recording</span>
+                    <span class="feature-badge">GPS Tracking</span>
+                    <span class="feature-badge">MQTT Communication</span>
+                    <span class="feature-badge">Motion Detection</span>
+                </div>
+
+                <h3>1. Hazard Detection System</h3>
+                <ul>
+                    <li><strong>Data Source:</strong> Backend server (192.168.8.105:3000)</li>
+                    <li><strong>Fetch Radius:</strong> 200km (standard) / 50km (high-frequency mode)</li>
+                    <li><strong>Update Frequency:</strong> Every 15 minutes (or 5 seconds in high-freq mode)</li>
+                    <li><strong>Proximity Threshold:</strong> Configurable 100m-500m (default: 500m)</li>
+                    <li><strong>Real-time Updates:</strong> Proximity checked every second</li>
+                </ul>
+
+                <h3>2. Proximity Warning Levels</h3>
+                <ul>
+                    <li><strong>Safe (Blue):</strong> No hazards nearby</li>
+                    <li><strong>Minor (Light Blue):</strong> Severity 1-4, minor hazards within threshold</li>
+                    <li><strong>Moderate (Yellow):</strong> Severity 5-6, moderate hazards within threshold</li>
+                    <li><strong>Getting Rough (Orange):</strong> Severity 7, hazard getting rough</li>
+                    <li><strong>Severe (Red):</strong> Severity 8-10, severe/very rough hazards within threshold</li>
+                </ul>
+
+                <h3>3. Hazard Properties</h3>
+                <ul>
+                    <li><strong>Location:</strong> Latitude/Longitude coordinates</li>
+                    <li><strong>Severity:</strong> 1-10 scale (1 = best/minor, 10 = worst/severe)</li>
+                    <li><strong>Labels:</strong> Multiple tags per hazard (pothole, debris, sharp turn, etc.)</li>
+                    <li><strong>Zone Radius:</strong> Danger zone size in meters</li>
+                    <li><strong>Detection Stats:</strong> Times detected, last detected date</li>
+                    <li><strong>Driver Notes:</strong> User-contributed information</li>
+                </ul>
+
+                <h3>4. User Interface Views (Swipe Navigation)</h3>
+                <ul>
+                    <li><strong>View 1 - Hazard HUD Only:</strong> Full-screen hazard warnings with dynamic colors, proximity countdown, directional arrow, and "Next Hazard" indicator</li>
+                    <li><strong>View 2 - HUD with Camera PIP:</strong> Hazard warnings with small picture-in-picture camera preview in bottom-right corner</li>
+                    <li><strong>View 3 - Camera with Warning Overlay:</strong> Full-screen camera view with hazard warning overlay on top, shows recording indicator and speed</li>
+                    <li><strong>Navigation:</strong> Swipe/tap between views using page indicator dots at bottom</li>
+                </ul>
+
+                <h3>5. Recording Features</h3>
+                <ul>
+                    <li><strong>Auto-Record Mode:</strong> Recording automatically starts/stops when vehicle motion is detected</li>
+                    <li><strong>Manual Recording:</strong> Manual REC/STOP buttons override auto-record mode</li>
+                    <li><strong>Quality:</strong> High-quality video using rear camera</li>
+                    <li><strong>Storage:</strong> Local device storage with automatic cleanup</li>
+                    <li><strong>Indicators:</strong> Visual "REC" badge when recording active</li>
+                </ul>
+
+                <h3>6. Location & Motion Tracking</h3>
+                <ul>
+                    <li><strong>GPS Updates:</strong> Every 5 seconds</li>
+                    <li><strong>Heading Detection:</strong> Compass for directional awareness</li>
+                    <li><strong>Speed Monitoring:</strong> Real-time speed in km/h</li>
+                    <li><strong>Motion Detection:</strong> Accelerometer for movement and road roughness</li>
+                </ul>
+
+                <h3>7. MQTT Communication</h3>
+                <ul>
+                    <li><strong>Broker:</strong> 192.168.8.105:1883</li>
+                    <li><strong>Published Data:</strong> Location updates (5s), status updates (5s), proximity alerts, heartbeat (60s)</li>
+                    <li><strong>Subscribed Topics:</strong> Remote commands and configuration updates</li>
+                </ul>
+
+                <h3>8. Next Hazard Feature</h3>
+                <ul>
+                    <li><strong>Forward Detection:</strong> Shows next hazard in direction of travel (±90° cone)</li>
+                    <li><strong>Smart Filtering:</strong> Excludes currently warned hazard</li>
+                    <li><strong>Display:</strong> Distance and arrow in top-right corner</li>
+                    <li><strong>Interactive:</strong> Tap to view map with hazards within 1000m</li>
+                </ul>
+
+                <h3>9. Visual Feedback System</h3>
+                <ul>
+                    <li><strong>Color Coding:</strong> Blue (safe), Light Blue (minor 1-4), Yellow (moderate 5-6), Orange (rough 7), Red (severe 8-10)</li>
+                    <li><strong>Dynamic Backgrounds:</strong> Changes based on proximity and severity (remember: 10 = worst, 1 = best)</li>
+                    <li><strong>Directional Arrows:</strong> Points toward hazard location</li>
+                    <li><strong>Distance Countdown:</strong> Large display showing meters to hazard</li>
+                </ul>
+
+                <h3>10. Status Indicators</h3>
+                <ul>
+                    <li><strong>Recording Status:</strong> Shows when dashcam is active</li>
+                    <li><strong>Motion Detection:</strong> Indicates vehicle movement</li>
+                    <li><strong>Orientation:</strong> Device position (landscape/portrait)</li>
+                    <li><strong>Road Roughness:</strong> Surface quality (smooth, moderate, rough, very rough)</li>
+                </ul>
+
+                <div class="help-text">
+                    <strong>How to use this simulator:</strong><br>
+                    Use the controls on the left to adjust various conditions and see how the app responds in real-time. Try different hazard distances, severity levels (remember: 10 = worst/severe, 1 = best/minor), and toggle features on/off. Navigate between three views using the page dots at the bottom:<br>
+                    • <strong>View 1:</strong> Hazard HUD only<br>
+                    • <strong>View 2:</strong> HUD with camera picture-in-picture<br>
+                    • <strong>View 3:</strong> Full camera with hazard warning overlay<br>
+                    Toggle between Auto-Record mode (records when moving) and Manual Recording (REC/STOP buttons).
+                </div>
+                    </div>
+                </div>
+
+                <!-- Examples Tab Content -->
+                <div class="tab-content" id="examplesContent">
+                    <h2 style="color: #1E88E5; margin-bottom: 20px;">Usage Scenarios</h2>
+                    <p style="margin-bottom: 20px; color: #666;">Below are common scenarios showing how the TerrainIQ Dashcam app responds to different driving conditions.</p>
+
+                    <div style="margin-bottom: 25px; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-weight: 600; margin-bottom: 10px; color: #333;">Preview Orientation:</div>
+                        <div class="button-group">
+                            <button class="toggle-button active" id="examplesPortraitBtn">Portrait</button>
+                            <button class="toggle-button" id="examplesLandscapeBtn">Landscape</button>
+                        </div>
+                        <button class="toggle-button" id="examplesBothBtn" style="margin-top: 10px;">Show Both</button>
+                    </div>
+
+                    <div class="scenario-list">
+                        <!-- Scenario 1 -->
+                        <div class="scenario-item">
+                            <div class="scenario-description">
+                                <h3>Critical Warning - Severe Hazard Ahead</h3>
+                                <p>Recording active, moving at 80 km/h, 150m from a Level 10 severity pothole. Background is red, large distance countdown visible.</p>
+                                <div class="scenario-meta">
+                                    <span class="meta-tag">🔴 High Alert</span>
+                                    <span class="meta-tag">📹 Recording</span>
+                                    <span class="meta-tag">📱 Portrait</span>
+                                </div>
+                                <button class="try-it-button" data-scenario="critical">Try It →</button>
+                            </div>
+                            <div class="scenario-previews-container">
+                                <div class="scenario-preview" data-scenario="critical"></div>
+                                <div class="scenario-preview landscape" data-scenario="critical" style="display: none;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Scenario 2 -->
+                        <div class="scenario-item">
+                            <div class="scenario-description">
+                                <h3>Warning - Rough Road Section</h3>
+                                <p>Recording active, 300m from a Level 8 rough surface. Orange background indicates moderate danger ahead.</p>
+                                <div class="scenario-meta">
+                                    <span class="meta-tag">🟠 Warning</span>
+                                    <span class="meta-tag">📹 Recording</span>
+                                    <span class="meta-tag">📱 Portrait</span>
+                                </div>
+                                <button class="try-it-button" data-scenario="rough-road">Try It →</button>
+                            </div>
+                            <div class="scenario-previews-container">
+                                <div class="scenario-preview" data-scenario="rough-road"></div>
+                                <div class="scenario-preview landscape" data-scenario="rough-road" style="display: none;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Scenario 3 -->
+                        <div class="scenario-item">
+                            <div class="scenario-description">
+                                <h3>Approaching Hazard - Moderate Severity</h3>
+                                <p>Recording, 500m from a Level 6 debris zone. Yellow background shows approaching hazard with moderate concern.</p>
+                                <div class="scenario-meta">
+                                    <span class="meta-tag">🟡 Caution</span>
+                                    <span class="meta-tag">📹 Recording</span>
+                                    <span class="meta-tag">📱 Portrait</span>
+                                </div>
+                                <button class="try-it-button" data-scenario="moderate">Try It →</button>
+                            </div>
+                            <div class="scenario-previews-container">
+                                <div class="scenario-preview" data-scenario="moderate"></div>
+                                <div class="scenario-preview landscape" data-scenario="moderate" style="display: none;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Scenario 4 -->
+                        <div class="scenario-item">
+                            <div class="scenario-description">
+                                <h3>Minor Hazard - Low Risk</h3>
+                                <p>Recording, 450m from a Level 3 sharp turn. Light blue background indicates low-risk hazard ahead.</p>
+                                <div class="scenario-meta">
+                                    <span class="meta-tag">🔵 Info</span>
+                                    <span class="meta-tag">📹 Recording</span>
+                                    <span class="meta-tag">📱 Portrait</span>
+                                </div>
+                                <button class="try-it-button" data-scenario="minor">Try It →</button>
+                            </div>
+                            <div class="scenario-previews-container">
+                                <div class="scenario-preview" data-scenario="minor"></div>
+                                <div class="scenario-preview landscape" data-scenario="minor" style="display: none;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Scenario 5 -->
+                        <div class="scenario-item">
+                            <div class="scenario-description">
+                                <h3>All Clear - Safe Driving</h3>
+                                <p>Recording active, no hazards detected within range. Blue background with "No Known Hazards" message.</p>
+                                <div class="scenario-meta">
+                                    <span class="meta-tag">✅ Safe</span>
+                                    <span class="meta-tag">📹 Recording</span>
+                                    <span class="meta-tag">📱 Portrait</span>
+                                </div>
+                                <button class="try-it-button" data-scenario="all-clear">Try It →</button>
+                            </div>
+                            <div class="scenario-previews-container">
+                                <div class="scenario-preview" data-scenario="all-clear"></div>
+                                <div class="scenario-preview landscape" data-scenario="all-clear" style="display: none;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Scenario 6 -->
+                        <div class="scenario-item">
+                            <div class="scenario-description">
+                                <h3>Stationary - Waiting to Stop Recording</h3>
+                                <p>Vehicle stopped, no hazards nearby. Auto-record mode will stop recording after 20 seconds of no motion.</p>
+                                <div class="scenario-meta">
+                                    <span class="meta-tag">⏸️ Stopped</span>
+                                    <span class="meta-tag">⏱️ Timer Active</span>
+                                    <span class="meta-tag">📱 Portrait</span>
+                                </div>
+                                <button class="try-it-button" data-scenario="stationary">Try It →</button>
+                            </div>
+                            <div class="scenario-previews-container">
+                                <div class="scenario-preview" data-scenario="stationary"></div>
+                                <div class="scenario-preview landscape" data-scenario="stationary" style="display: none;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Scenario 7 -->
+                        <div class="scenario-item">
+                            <div class="scenario-description">
+                                <h3>Camera View with Overlay - Active Warning</h3>
+                                <p>Full camera view with hazard warning overlay. 200m from Level 9 accident zone, recording at 70 km/h.</p>
+                                <div class="scenario-meta">
+                                    <span class="meta-tag">🔴 High Alert</span>
+                                    <span class="meta-tag">📹 Recording</span>
+                                    <span class="meta-tag">📱 Portrait</span>
+                                    <span class="meta-tag">📸 Camera View</span>
+                                </div>
+                                <button class="try-it-button" data-scenario="camera-overlay">Try It →</button>
+                            </div>
+                            <div class="scenario-previews-container">
+                                <div class="scenario-preview" data-scenario="camera-overlay"></div>
+                                <div class="scenario-preview landscape" data-scenario="camera-overlay" style="display: none;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Scenario 8 -->
+                        <div class="scenario-item">
+                            <div class="scenario-description">
+                                <h3>HUD with Picture-in-Picture</h3>
+                                <p>Hazard HUD view with small camera preview in corner. 400m from Level 7 hazard, moving at 60 km/h.</p>
+                                <div class="scenario-meta">
+                                    <span class="meta-tag">🟠 Warning</span>
+                                    <span class="meta-tag">📹 Recording</span>
+                                    <span class="meta-tag">📱 Portrait</span>
+                                    <span class="meta-tag">🖼️ PIP View</span>
+                                </div>
+                                <button class="try-it-button" data-scenario="pip-view">Try It →</button>
+                            </div>
+                            <div class="scenario-previews-container">
+                                <div class="scenario-preview" data-scenario="pip-view"></div>
+                                <div class="scenario-preview landscape" data-scenario="pip-view" style="display: none;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Scenario 9 -->
+                        <div class="scenario-item">
+                            <div class="scenario-description">
+                                <h3>Landscape Mode - Wide Hazard View</h3>
+                                <p>Device in landscape orientation, 250m from Level 9 hazard. Wider view optimized for dashboard mounting.</p>
+                                <div class="scenario-meta">
+                                    <span class="meta-tag">🔴 High Alert</span>
+                                    <span class="meta-tag">📹 Recording</span>
+                                    <span class="meta-tag">📱 Landscape</span>
+                                </div>
+                                <button class="try-it-button" data-scenario="landscape-critical">Try It →</button>
+                            </div>
+                            <div class="scenario-previews-container">
+                                <div class="scenario-preview" data-scenario="landscape-critical" style="display: none;"></div>
+                                <div class="scenario-preview landscape" data-scenario="landscape-critical"></div>
+                            </div>
+                        </div>
+
+                        <!-- Scenario 10 -->
+                        <div class="scenario-item">
+                            <div class="scenario-description">
+                                <h3>Landscape Camera View</h3>
+                                <p>Full camera feed in landscape mode, 180m from Level 8 hazard with overlay warning visible.</p>
+                                <div class="scenario-meta">
+                                    <span class="meta-tag">🔴 High Alert</span>
+                                    <span class="meta-tag">📹 Recording</span>
+                                    <span class="meta-tag">📱 Landscape</span>
+                                    <span class="meta-tag">📸 Camera View</span>
+                                </div>
+                                <button class="try-it-button" data-scenario="landscape-camera">Try It →</button>
+                            </div>
+                            <div class="scenario-previews-container">
+                                <div class="scenario-preview" data-scenario="landscape-camera" style="display: none;"></div>
+                                <div class="scenario-preview landscape" data-scenario="landscape-camera"></div>
+                            </div>
+                        </div>
+
+                        <!-- Scenario 11 -->
+                        <div class="scenario-item">
+                            <div class="scenario-description">
+                                <h3>Multiple Hazards - Next Hazard Indicator</h3>
+                                <p>250m from current hazard (Level 8), with next hazard 550m ahead. "Next Hazard" indicator shows upcoming danger.</p>
+                                <div class="scenario-meta">
+                                    <span class="meta-tag">🔴 High Alert</span>
+                                    <span class="meta-tag">📹 Recording</span>
+                                    <span class="meta-tag">➡️ Multiple Hazards</span>
+                                </div>
+                                <button class="try-it-button" data-scenario="multiple-hazards">Try It →</button>
+                            </div>
+                            <div class="scenario-previews-container">
+                                <div class="scenario-preview" data-scenario="multiple-hazards"></div>
+                                <div class="scenario-preview landscape" data-scenario="multiple-hazards" style="display: none;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Scenario 12 -->
+                        <div class="scenario-item">
+                            <div class="scenario-description">
+                                <h3>Manual Recording Override</h3>
+                                <p>Driver manually started recording while stationary. Auto-record disabled, recording continues regardless of motion.</p>
+                                <div class="scenario-meta">
+                                    <span class="meta-tag">📹 Manual Record</span>
+                                    <span class="meta-tag">⏸️ Stopped</span>
+                                    <span class="meta-tag">✅ Safe</span>
+                                </div>
+                                <button class="try-it-button" data-scenario="manual-record">Try It →</button>
+                            </div>
+                            <div class="scenario-previews-container">
+                                <div class="scenario-preview" data-scenario="manual-record"></div>
+                                <div class="scenario-preview landscape" data-scenario="manual-record" style="display: none;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="simulator-section">
+                <div class="phone-simulator">
+                    <div class="phone-notch"></div>
+                    <div class="phone-screen" id="phoneScreen">
+                        <!-- Flutter App Container (Hidden by default) -->
+                        <iframe
+                            id="flutterAppFrame"
+                            src="about:blank"
+                            style="display: none; width: 100%; height: 100%; border: none; background: #1976D2;"
+                            allow="accelerometer; camera; geolocation; microphone">
+                        </iframe>
+
+                        <!-- Annotations -->
+                        <div class="annotation top" id="annotationStatus" style="top: 40px; left: 50%; transform: translateX(-50%);">
+                            Status bar shows recording, motion, and device state
+                        </div>
+                        <div class="annotation right" id="annotationNext" style="top: 60px; right: 160px;">
+                            Next hazard indicator shows upcoming hazards
+                        </div>
+                        <div class="annotation left" id="annotationDistance" style="top: 50%; left: 50%; transform: translate(-50%, -50%);">
+                            Distance countdown shows meters to hazard
+                        </div>
+
+                        <!-- Hazard HUD View -->
+                        <div class="app-view" id="hazardView">
+                            <div class="status-bar">
+                                <div>
+                                    <span class="status-badge" id="statusRecording">REC</span>
+                                    <span class="status-badge" id="statusMotion">MOVING</span>
+                                </div>
+                                <div>
+                                    <span class="status-badge" id="statusOrientation">LANDSCAPE</span>
+                                    <span class="status-badge" id="statusRoughness">SMOOTH</span>
+                                </div>
+                            </div>
+
+                            <div class="next-hazard-indicator" id="nextHazard">
+                                Next: 345m ↗
+                            </div>
+
+                            <div class="hazard-hud" id="hazardContent">
+                                <div class="hazard-icon" id="hazardIcon">⚠️</div>
+                                <div class="hazard-type" id="hazardType">POTHOLE AHEAD</div>
+                                <div class="hazard-distance" id="hazardDistance">450<span style="font-size: 40px;">m</span></div>
+                                <div class="hazard-direction" id="hazardDirection">↑</div>
+                            </div>
+                        </div>
+
+                        <!-- Camera View -->
+                        <div class="camera-view" id="cameraView">
+                            <div class="camera-placeholder">
+                                📹 Camera Preview
+                            </div>
+                            <div class="camera-overlay">
+                                <div>Orientation: <strong id="cameraOrientation">Rear ↑ N</strong></div>
+                                <div style="margin-top: 5px;">Direction: <strong id="cameraDirection">North</strong></div>
+                            </div>
+                            <div class="rec-indicator" id="recIndicator">● REC</div>
+                            <div class="speed-display" id="speedDisplay">65 km/h</div>
+
+                            <!-- Hazard Warning Overlay (for full camera view with warnings) -->
+                            <div class="hazard-overlay" id="hazardOverlay">
+                                <div class="overlay-warning" id="overlayWarning">
+                                    <div class="overlay-warning-type" id="overlayWarningType">POTHOLE AHEAD</div>
+                                    <div class="overlay-warning-distance" id="overlayWarningDistance">450m</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Camera PIP (Picture-in-Picture) -->
+                        <div class="camera-pip" id="cameraPip">
+                            📹
+                        </div>
+
+                        <div class="page-indicators">
+                            <div class="page-dot active" id="dot1"></div>
+                            <div class="page-dot" id="dot2"></div>
+                            <div class="page-dot" id="dot3"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching functionality
+        const controlsTab = document.getElementById('controlsTab');
+        const requirementsTab = document.getElementById('requirementsTab');
+        const examplesTab = document.getElementById('examplesTab');
+        const controlsContent = document.getElementById('controlsContent');
+        const requirementsContent = document.getElementById('requirementsContent');
+        const examplesContent = document.getElementById('examplesContent');
+        const mainContentDiv = document.querySelector('.main-content');
+
+        // Scroll position memory
+        let examplesScrollPosition = 0;
+
+        controlsTab.addEventListener('click', () => {
+            // Save scroll position before leaving Examples tab
+            if (examplesContent.classList.contains('active')) {
+                examplesScrollPosition = examplesContent.scrollTop;
+            }
+
+            controlsTab.classList.add('active');
+            requirementsTab.classList.remove('active');
+            examplesTab.classList.remove('active');
+            controlsContent.classList.add('active');
+            requirementsContent.classList.remove('active');
+            examplesContent.classList.remove('active');
+            mainContentDiv.classList.remove('examples-view');
+        });
+
+        requirementsTab.addEventListener('click', () => {
+            // Save scroll position before leaving Examples tab
+            if (examplesContent.classList.contains('active')) {
+                examplesScrollPosition = examplesContent.scrollTop;
+            }
+
+            requirementsTab.classList.add('active');
+            controlsTab.classList.remove('active');
+            examplesTab.classList.remove('active');
+            requirementsContent.classList.add('active');
+            controlsContent.classList.remove('active');
+            examplesContent.classList.remove('active');
+            mainContentDiv.classList.remove('examples-view');
+        });
+
+        examplesTab.addEventListener('click', () => {
+            examplesTab.classList.add('active');
+            controlsTab.classList.remove('active');
+            requirementsTab.classList.remove('active');
+            examplesContent.classList.add('active');
+            controlsContent.classList.remove('active');
+            requirementsContent.classList.remove('active');
+            mainContentDiv.classList.add('examples-view');
+
+            // Restore scroll position
+            setTimeout(() => {
+                examplesContent.scrollTop = examplesScrollPosition;
+            }, 50);
+        });
+
+        // Rest of the script
+        // State management
+        const state = {
+            currentPage: 1,  // 1: HUD only, 2: HUD + PIP, 3: Camera + Overlay
+            distance: 450,
+            severity: 5,
+            speed: 65,
+            nextDistance: 345,
+            hazardType: 'POTHOLE AHEAD',
+            recording: true,
+            autoRecord: true,
+            moving: true,
+            showAnnotations: false,
+            orientation: 'portrait',  // portrait or landscape
+            videoLayout: 'pip',  // 'pip' or 'docked'
+            simulatorMode: 'html',  // 'html' or 'flutter'
+            mqttConnected: false
+        };
+
+        // MQTT Client
+        let mqttClient = null;
+        const MQTT_BROKER = 'ws://localhost:3301'; // WebSocket port for MQTT broker
+        const MQTT_TOPICS = {
+            PREVIEW_ENABLE: 'terrainiq/simulator/preview/enable',
+            PREVIEW_VIEW: 'terrainiq/simulator/preview/view',
+            PREVIEW_HAZARD: 'terrainiq/simulator/preview/hazard',
+            PREVIEW_VEHICLE: 'terrainiq/simulator/preview/vehicle',
+            PREVIEW_RECORDING: 'terrainiq/simulator/preview/recording',
+            PREVIEW_ORIENTATION: 'terrainiq/simulator/preview/orientation',
+            FLUTTER_STATUS: 'terrainiq/flutter/preview/status'
+        };
+
+        // DOM elements
+        const phoneScreen = document.getElementById('phoneScreen');
+        const hazardView = document.getElementById('hazardView');
+        const cameraView = document.getElementById('cameraView');
+        const hazardDistance = document.getElementById('hazardDistance');
+        const hazardType = document.getElementById('hazardType');
+        const hazardIcon = document.getElementById('hazardIcon');
+        const nextHazard = document.getElementById('nextHazard');
+        const speedDisplay = document.getElementById('speedDisplay');
+        const recIndicator = document.getElementById('recIndicator');
+        const statusRecording = document.getElementById('statusRecording');
+        const statusMotion = document.getElementById('statusMotion');
+        const statusOrientation = document.getElementById('statusOrientation');
+
+        // Control elements
+        const distanceSlider = document.getElementById('distanceSlider');
+        const severitySlider = document.getElementById('severitySlider');
+        const speedSlider = document.getElementById('speedSlider');
+        const nextDistanceSlider = document.getElementById('nextDistanceSlider');
+        const hazardTypeSelect = document.getElementById('hazardTypeSelect');
+        const autoRecordToggle = document.getElementById('autoRecordToggle');
+        const manualRecordToggle = document.getElementById('manualRecordToggle');
+        const stopRecordButton = document.getElementById('stopRecordButton');
+        const motionToggle = document.getElementById('motionToggle');
+        const portraitButton = document.getElementById('portraitButton');
+        const landscapeButton = document.getElementById('landscapeButton');
+        const annotationsToggle = document.getElementById('annotationsToggle');
+        const mainContent = document.querySelector('.main-content');
+        const viewStateSelect = document.getElementById('viewStateSelect');
+        const pipLayoutButton = document.getElementById('pipLayoutButton');
+        const dockedLayoutButton = document.getElementById('dockedLayoutButton');
+
+        // Value displays
+        const distanceValue = document.getElementById('distanceValue');
+        const severityValue = document.getElementById('severityValue');
+        const speedValue = document.getElementById('speedValue');
+        const nextDistanceValue = document.getElementById('nextDistanceValue');
+
+        // Page navigation
+        const dot1 = document.getElementById('dot1');
+        const dot2 = document.getElementById('dot2');
+        const dot3 = document.getElementById('dot3');
+        const cameraPip = document.getElementById('cameraPip');
+        const hazardOverlay = document.getElementById('hazardOverlay');
+        const overlayWarning = document.getElementById('overlayWarning');
+        const overlayWarningType = document.getElementById('overlayWarningType');
+        const overlayWarningDistance = document.getElementById('overlayWarningDistance');
+
+        // Mode toggle elements
+        const htmlModeButton = document.getElementById('htmlModeButton');
+        const flutterModeButton = document.getElementById('flutterModeButton');
+        const mqttStatusText = document.getElementById('mqttStatusText');
+        const flutterAppFrame = document.getElementById('flutterAppFrame');
+
+        // MQTT Functions
+        function updateMQTTStatus(message, color) {
+            mqttStatusText.textContent = `MQTT: ${message}`;
+            document.getElementById('mqttStatus').style.backgroundColor = color === '#4CAF50' ? '#e8f5e9' :
+                                                                         color === '#f44336' ? '#ffebee' : '#f0f0f0';
+            document.getElementById('mqttStatus').style.color = color === '#4CAF50' ? '#2e7d32' :
+                                                               color === '#f44336' ? '#c62828' : '#666';
+        }
+
+        function initMQTT() {
+            try {
+                mqttClient = mqtt.connect(MQTT_BROKER, {
+                    clientId: 'terrainiq_simulator_' + Math.random().toString(16).substr(2, 8),
+                    clean: true,
+                    reconnectPeriod: 1000,
+                    connectTimeout: 5000
+                });
+
+                mqttClient.on('connect', () => {
+                    console.log('MQTT connected to', MQTT_BROKER);
+                    state.mqttConnected = true;
+                    updateMQTTStatus('Connected', '#4CAF50');
+
+                    // Subscribe to Flutter status messages
+                    mqttClient.subscribe(MQTT_TOPICS.FLUTTER_STATUS, (err) => {
+                        if (err) {
+                            console.error('Subscribe error:', err);
+                        }
+                    });
+                });
+
+                mqttClient.on('error', (err) => {
+                    console.error('MQTT error:', err);
+                    state.mqttConnected = false;
+                    updateMQTTStatus('Error: ' + err.message, '#f44336');
+                });
+
+                mqttClient.on('close', () => {
+                    console.log('MQTT connection closed');
+                    state.mqttConnected = false;
+                    updateMQTTStatus('Disconnected', '#f44336');
+                });
+
+                mqttClient.on('message', (topic, message) => {
+                    if (topic === MQTT_TOPICS.FLUTTER_STATUS) {
+                        try {
+                            const status = JSON.parse(message.toString());
+                            console.log('Flutter status:', status);
+                            if (status.ready && status.mode === 'preview') {
+                                updateMQTTStatus('Flutter app ready', '#4CAF50');
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse Flutter status:', e);
+                        }
+                    }
+                });
+
+            } catch (err) {
+                console.error('MQTT initialization failed:', err);
+                updateMQTTStatus('Failed to connect', '#f44336');
+            }
+        }
+
+        function publishHazardUpdate() {
+            if (!mqttClient || !state.mqttConnected || state.simulatorMode !== 'flutter') return;
+
+            const payload = {
+                distance: state.distance,
+                severity: state.severity,
+                type: state.hazardType,
+                nextHazardDistance: state.nextDistance,
+                icon: hazardIcons[state.hazardType] || '⚠️'
+            };
+
+            mqttClient.publish(MQTT_TOPICS.PREVIEW_HAZARD, JSON.stringify(payload), { qos: 1 });
+            console.log('Published hazard update:', payload);
+        }
+
+        function publishVehicleUpdate() {
+            if (!mqttClient || !state.mqttConnected || state.simulatorMode !== 'flutter') return;
+
+            const payload = {
+                speed: state.speed,
+                moving: state.moving,
+                latitude: 0.0,
+                longitude: 0.0,
+                heading: 0.0
+            };
+
+            mqttClient.publish(MQTT_TOPICS.PREVIEW_VEHICLE, JSON.stringify(payload), { qos: 1 });
+            console.log('Published vehicle update:', payload);
+        }
+
+        function publishRecordingUpdate() {
+            if (!mqttClient || !state.mqttConnected || state.simulatorMode !== 'flutter') return;
+
+            const payload = {
+                recording: state.recording,
+                autoRecord: state.autoRecord,
+                manualOverride: !state.autoRecord && state.recording
+            };
+
+            mqttClient.publish(MQTT_TOPICS.PREVIEW_RECORDING, JSON.stringify(payload), { qos: 1 });
+            console.log('Published recording update:', payload);
+        }
+
+        function publishOrientationUpdate() {
+            if (!mqttClient || !state.mqttConnected || state.simulatorMode !== 'flutter') return;
+
+            const payload = {
+                orientation: state.orientation
+            };
+
+            mqttClient.publish(MQTT_TOPICS.PREVIEW_ORIENTATION, JSON.stringify(payload), { qos: 1 });
+            console.log('Published orientation update:', payload);
+        }
+
+        function publishViewUpdate() {
+            if (!mqttClient || !state.mqttConnected || state.simulatorMode !== 'flutter') return;
+
+            const payload = {
+                page: state.currentPage
+            };
+
+            mqttClient.publish(MQTT_TOPICS.PREVIEW_VIEW, JSON.stringify(payload), { qos: 1 });
+            console.log('Published view update:', payload);
+        }
+
+        function switchSimulatorMode(mode) {
+            state.simulatorMode = mode;
+
+            if (mode === 'flutter') {
+                // Hide HTML simulator, show Flutter iframe
+                hazardView.style.display = 'none';
+                cameraView.classList.remove('active');
+                flutterAppFrame.style.display = 'block';
+                flutterAppFrame.src = 'http://localhost:3201/#/preview'; // Flutter preview route
+
+                // Enable preview mode in Flutter
+                if (mqttClient && state.mqttConnected) {
+                    mqttClient.publish(MQTT_TOPICS.PREVIEW_ENABLE, JSON.stringify({ enabled: true }), { qos: 1, retain: true });
+
+                    // Publish current state to Flutter
+                    setTimeout(() => {
+                        publishViewUpdate();
+                        publishHazardUpdate();
+                        publishVehicleUpdate();
+                        publishRecordingUpdate();
+                        publishOrientationUpdate();
+                    }, 1000); // Increased delay to allow Flutter to connect to MQTT
+                }
+
+                // Update button states
+                htmlModeButton.classList.remove('active');
+                flutterModeButton.classList.add('active');
+            } else {
+                // Show HTML simulator, hide Flutter iframe
+                flutterAppFrame.style.display = 'none';
+                flutterAppFrame.src = 'about:blank';
+                switchPage(state.currentPage);
+
+                // Disable preview mode in Flutter
+                if (mqttClient && state.mqttConnected) {
+                    mqttClient.publish(MQTT_TOPICS.PREVIEW_ENABLE, JSON.stringify({ enabled: false }), { qos: 1, retain: true });
+                }
+
+                // Update button states
+                htmlModeButton.classList.add('active');
+                flutterModeButton.classList.remove('active');
+            }
+        }
+
+        // Initialize MQTT on page load
+        initMQTT();
+
+        // Mode toggle event listeners
+        htmlModeButton.addEventListener('click', () => {
+            switchSimulatorMode('html');
+        });
+
+        flutterModeButton.addEventListener('click', () => {
+            if (!state.mqttConnected) {
+                alert('MQTT connection not available. Please ensure the MQTT broker is running at ' + MQTT_BROKER);
+                return;
+            }
+            switchSimulatorMode('flutter');
+        });
+
+        // Hazard type icons
+        const hazardIcons = {
+            'POTHOLE AHEAD': '⚠️',
+            'SHARP TURN': '↪️',
+            'DEBRIS ON ROAD': '🚧',
+            'ROUGH SURFACE': '〰️',
+            'ACCIDENT ZONE': '🚨'
+        };
+
+        // Update background color based on distance and severity
+        // Severity scale: 1=best (minor), 10=worst (severe)
+        function updateBackgroundColor() {
+            const { distance, severity } = state;
+
+            if (distance === 0) {
+                phoneScreen.style.backgroundColor = '#1976D2'; // Safe blue
+                hazardDistance.parentElement.style.display = 'none';
+                document.getElementById('hazardContent').innerHTML = '<div class="all-clear">No Known Hazards ✓</div>';
+                return;
+            }
+
+            hazardDistance.parentElement.style.display = 'block';
+
+            // Severity 8-10 (severe/rough) within proximity = RED
+            if (severity >= 8 && distance <= 500) {
+                phoneScreen.style.backgroundColor = '#D32F2F';
+            }
+            // Severity 7 (getting rough) within proximity = ORANGE
+            else if (severity === 7 && distance <= 500) {
+                phoneScreen.style.backgroundColor = '#FF6F00';
+            }
+            // Severity 5-6 (moderate) within proximity = YELLOW
+            else if (severity >= 5 && severity <= 6 && distance <= 500) {
+                phoneScreen.style.backgroundColor = '#FBC02D';
+            }
+            // Severity 1-4 (minor) within proximity = LIGHT BLUE (approaching but not severe)
+            else if (severity >= 1 && severity <= 4 && distance <= 500) {
+                phoneScreen.style.backgroundColor = '#29B6F6';
+            }
+            // Safe (no hazards nearby or too far) = BLUE
+            else {
+                phoneScreen.style.backgroundColor = '#1976D2';
+            }
+        }
+
+        // Update hazard display
+        function updateHazardDisplay() {
+            const hazardContent = document.getElementById('hazardContent');
+
+            if (state.distance === 0) {
+                // Show "All Clear" state
+                hazardContent.innerHTML = '<div class="all-clear">No Known Hazards ✓</div>';
+                hazardOverlay.classList.remove('visible');
+                updateBackgroundColor();
+                return;
+            }
+
+            // Restore hazard content if it was cleared
+            if (!document.getElementById('hazardIcon')) {
+                hazardContent.innerHTML = `
+                    <div class="hazard-icon" id="hazardIcon">⚠️</div>
+                    <div class="hazard-type" id="hazardType">POTHOLE AHEAD</div>
+                    <div class="hazard-distance" id="hazardDistance">450<span style="font-size: 40px;">m</span></div>
+                    <div class="hazard-direction" id="hazardDirection">↑</div>
+                `;
+            }
+
+            const icon = document.getElementById('hazardIcon');
+            const type = document.getElementById('hazardType');
+            const distance = document.getElementById('hazardDistance');
+
+            icon.textContent = hazardIcons[state.hazardType] || '⚠️';
+            type.textContent = state.hazardType;
+            distance.innerHTML = `${state.distance}<span style="font-size: 40px;">m</span>`;
+
+            updateBackgroundColor();
+
+            // Update overlay if on page 3 (camera view with overlay)
+            if (state.currentPage === 3) {
+                hazardOverlay.classList.add('visible');
+                updateHazardOverlay();
+            }
+        }
+
+        // Update next hazard indicator
+        function updateNextHazard() {
+            nextHazard.innerHTML = `Next: ${state.nextDistance}m ↗`;
+        }
+
+        // Update speed display
+        function updateSpeed() {
+            speedDisplay.textContent = `${state.speed} km/h`;
+        }
+
+        // Update recording status
+        function updateRecording() {
+            if (state.recording) {
+                recIndicator.classList.add('active');
+                statusRecording.style.display = 'inline-block';
+            } else {
+                recIndicator.classList.remove('active');
+                statusRecording.style.display = 'none';
+            }
+        }
+
+        // Update motion status
+        function updateMotion() {
+            statusMotion.textContent = state.moving ? 'MOVING' : 'STOPPED';
+            statusMotion.style.background = state.moving ? 'rgba(76, 175, 80, 0.3)' : 'rgba(244, 67, 54, 0.3)';
+        }
+
+        // Toggle annotations
+        function toggleAnnotations() {
+            const annotations = document.querySelectorAll('.annotation');
+            annotations.forEach(ann => {
+                ann.classList.toggle('visible', state.showAnnotations);
+            });
+        }
+
+        // Event listeners for sliders
+        distanceSlider.addEventListener('input', (e) => {
+            state.distance = parseInt(e.target.value);
+            distanceValue.textContent = state.distance;
+            updateHazardDisplay();
+            publishHazardUpdate();
+        });
+
+        severitySlider.addEventListener('input', (e) => {
+            state.severity = parseInt(e.target.value);
+            severityValue.textContent = state.severity;
+            updateHazardDisplay();
+            publishHazardUpdate();
+        });
+
+        speedSlider.addEventListener('input', (e) => {
+            state.speed = parseInt(e.target.value);
+            speedValue.textContent = state.speed;
+            updateSpeed();
+            publishVehicleUpdate();
+        });
+
+        nextDistanceSlider.addEventListener('input', (e) => {
+            state.nextDistance = parseInt(e.target.value);
+            nextDistanceValue.textContent = state.nextDistance;
+            updateNextHazard();
+            publishHazardUpdate();
+        });
+
+        hazardTypeSelect.addEventListener('change', (e) => {
+            state.hazardType = e.target.value;
+            updateHazardDisplay();
+            publishHazardUpdate();
+        });
+
+        // Toggle buttons
+        autoRecordToggle.addEventListener('click', () => {
+            state.autoRecord = !state.autoRecord;
+            autoRecordToggle.classList.toggle('active', state.autoRecord);
+            autoRecordToggle.textContent = state.autoRecord ? 'ON' : 'OFF';
+
+            // When auto-record is on and moving, start recording
+            if (state.autoRecord && state.moving) {
+                state.recording = true;
+            } else if (state.autoRecord && !state.moving) {
+                state.recording = false;
+            }
+            updateRecording();
+            publishRecordingUpdate();
+        });
+
+        manualRecordToggle.addEventListener('click', () => {
+            // Disable auto-record when manually starting recording
+            if (!state.recording) {
+                state.autoRecord = false;
+                autoRecordToggle.classList.remove('active');
+                autoRecordToggle.textContent = 'OFF';
+            }
+            state.recording = true;
+            manualRecordToggle.classList.add('active');
+            stopRecordButton.classList.remove('active');
+            updateRecording();
+            publishRecordingUpdate();
+        });
+
+        stopRecordButton.addEventListener('click', () => {
+            state.recording = false;
+            manualRecordToggle.classList.remove('active');
+            stopRecordButton.classList.add('active');
+            updateRecording();
+            publishRecordingUpdate();
+        });
+
+        motionToggle.addEventListener('click', () => {
+            state.moving = !state.moving;
+            motionToggle.classList.toggle('active', state.moving);
+            motionToggle.textContent = state.moving ? 'MOVING' : 'STOPPED';
+
+            // If auto-record is on, update recording based on motion
+            if (state.autoRecord) {
+                state.recording = state.moving;
+                if (state.recording) {
+                    manualRecordToggle.classList.add('active');
+                    stopRecordButton.classList.remove('active');
+                } else {
+                    manualRecordToggle.classList.remove('active');
+                    stopRecordButton.classList.add('active');
+                }
+            }
+            updateMotion();
+            updateRecording();
+            publishVehicleUpdate();
+            publishRecordingUpdate();
+        });
+
+        // Orientation toggle
+        portraitButton.addEventListener('click', () => {
+            state.orientation = 'portrait';
+            portraitButton.classList.add('active');
+            landscapeButton.classList.remove('active');
+            mainContent.classList.remove('landscape-mode');
+            statusOrientation.textContent = 'PORTRAIT';
+            updateVideoLayout();
+            publishOrientationUpdate();
+        });
+
+        landscapeButton.addEventListener('click', () => {
+            state.orientation = 'landscape';
+            landscapeButton.classList.add('active');
+            portraitButton.classList.remove('active');
+            mainContent.classList.add('landscape-mode');
+            statusOrientation.textContent = 'LANDSCAPE';
+            updateVideoLayout();
+            publishOrientationUpdate();
+        });
+
+        annotationsToggle.addEventListener('click', () => {
+            state.showAnnotations = !state.showAnnotations;
+            annotationsToggle.classList.toggle('active', state.showAnnotations);
+            annotationsToggle.textContent = state.showAnnotations ? 'ON' : 'OFF';
+            toggleAnnotations();
+        });
+
+        // View Mode selector (maps to page navigation)
+        viewStateSelect.addEventListener('change', (e) => {
+            const page = parseInt(e.target.value);
+            switchPage(page);
+        });
+
+        // Video Layout toggle
+        pipLayoutButton.addEventListener('click', () => {
+            state.videoLayout = 'pip';
+            pipLayoutButton.classList.add('active');
+            dockedLayoutButton.classList.remove('active');
+            updateVideoLayout();
+        });
+
+        dockedLayoutButton.addEventListener('click', () => {
+            state.videoLayout = 'docked';
+            dockedLayoutButton.classList.add('active');
+            pipLayoutButton.classList.remove('active');
+            updateVideoLayout();
+        });
+
+        // Update video layout based on current state
+        function updateVideoLayout() {
+            if (state.currentPage === 2) {
+                if (state.videoLayout === 'docked') {
+                    phoneScreen.classList.add('docked-layout');
+                    phoneScreen.classList.add(state.orientation);
+                } else {
+                    phoneScreen.classList.remove('docked-layout');
+                    phoneScreen.classList.remove('portrait', 'landscape');
+                }
+            }
+        }
+
+        // Page navigation
+        dot1.addEventListener('click', () => {
+            switchPage(1);
+            viewStateSelect.value = '1';
+        });
+        dot2.addEventListener('click', () => {
+            switchPage(2);
+            viewStateSelect.value = '2';
+        });
+        dot3.addEventListener('click', () => {
+            switchPage(3);
+            viewStateSelect.value = '3';
+        });
+
+        function switchPage(page) {
+            state.currentPage = page;
+
+            // Reset all views
+            hazardView.style.display = 'none';
+            cameraView.classList.remove('active');
+            cameraPip.classList.remove('visible');
+            hazardOverlay.classList.remove('visible');
+            dot1.classList.remove('active');
+            dot2.classList.remove('active');
+            dot3.classList.remove('active');
+            phoneScreen.classList.remove('docked-layout', 'portrait', 'landscape');
+
+            if (page === 1) {
+                // Page 1: Hazard HUD only
+                hazardView.style.display = 'flex';
+                dot1.classList.add('active');
+            } else if (page === 2) {
+                // Page 2: Hazard HUD with Camera PIP (or Docked)
+                hazardView.style.display = 'flex';
+                cameraPip.classList.add('visible');
+                dot2.classList.add('active');
+                updateVideoLayout();
+            } else if (page === 3) {
+                // Page 3: Full Camera with Hazard Overlay
+                cameraView.classList.add('active');
+                if (state.distance > 0) {
+                    hazardOverlay.classList.add('visible');
+                    updateHazardOverlay();
+                }
+                dot3.classList.add('active');
+            }
+
+            // Publish view change to Flutter via MQTT
+            publishViewUpdate();
+        }
+
+        // Update hazard overlay for camera view
+        function updateHazardOverlay() {
+            overlayWarningType.textContent = state.hazardType;
+            overlayWarningDistance.textContent = `${state.distance}m`;
+
+            // Update overlay warning color based on severity
+            overlayWarning.classList.remove('medium', 'low');
+            if (state.severity >= 8) {
+                // Red - high severity
+            } else if (state.severity === 7) {
+                overlayWarning.classList.add('medium');
+            } else if (state.severity >= 5) {
+                overlayWarning.classList.add('low');
+            } else {
+                overlayWarning.classList.add('low');
+            }
+        }
+
+        // Preset buttons
+        document.getElementById('presetSafe').addEventListener('click', () => {
+            distanceSlider.value = 0;
+            severitySlider.value = 1;
+            state.distance = 0;
+            state.severity = 1;
+            distanceValue.textContent = 0;
+            severityValue.textContent = 1;
+            updateHazardDisplay();
+        });
+
+        document.getElementById('presetWarning').addEventListener('click', () => {
+            distanceSlider.value = 450;
+            severitySlider.value = 5;
+            state.distance = 450;
+            state.severity = 5;
+            distanceValue.textContent = 450;
+            severityValue.textContent = 5;
+            updateHazardDisplay();
+        });
+
+        document.getElementById('presetDanger').addEventListener('click', () => {
+            distanceSlider.value = 200;
+            severitySlider.value = 9;
+            state.distance = 200;
+            state.severity = 9;
+            distanceValue.textContent = 200;
+            severityValue.textContent = 9;
+            updateHazardDisplay();
+        });
+
+        document.getElementById('presetInside').addEventListener('click', () => {
+            distanceSlider.value = 50;
+            severitySlider.value = 10;
+            state.distance = 50;
+            state.severity = 10;
+            distanceValue.textContent = 50;
+            severityValue.textContent = 10;
+            updateHazardDisplay();
+        });
+
+        // Initialize display
+        updateHazardDisplay();
+        updateNextHazard();
+        updateSpeed();
+        updateRecording();
+        updateMotion();
+
+        // Track active screen for each scenario
+        const scenarioActiveScreens = {};
+
+        // Render scenario previews
+        function renderScenarioPreviews() {
+            const scenarios = {
+                'critical': { distance: 150, severity: 10, type: 'POTHOLE AHEAD', recording: true, speed: 80, view: 1, screens: ['hazard', 'camera', 'settings', 'nav'] },
+                'rough-road': { distance: 300, severity: 8, type: 'ROUGH SURFACE', recording: true, speed: 65, view: 1, screens: ['hazard', 'camera', 'settings', 'nav'] },
+                'moderate': { distance: 500, severity: 6, type: 'DEBRIS ON ROAD', recording: true, speed: 60, view: 1, screens: ['hazard', 'camera', 'settings', 'nav'] },
+                'minor': { distance: 450, severity: 3, type: 'SHARP TURN', recording: true, speed: 70, view: 1, arrow: '↑', screens: ['hazard', 'camera', 'settings', 'nav'] },
+                'all-clear': { distance: 0, severity: 1, type: 'POTHOLE AHEAD', recording: true, speed: 75, view: 1, screens: ['hazard', 'camera', 'settings', 'nav'] },
+                'stationary': { distance: 0, severity: 1, type: 'POTHOLE AHEAD', recording: false, speed: 0, view: 1, screens: ['hazard', 'camera', 'settings', 'nav'] },
+                'camera-overlay': { distance: 200, severity: 9, type: 'ACCIDENT ZONE', recording: true, speed: 70, view: 3, screens: ['hazard', 'camera', 'settings', 'nav'] },
+                'pip-view': { distance: 400, severity: 7, type: 'ROUGH SURFACE', recording: true, speed: 60, view: 2, screens: ['hazard', 'camera', 'settings', 'nav'] },
+                'landscape-critical': { distance: 250, severity: 9, type: 'POTHOLE AHEAD', recording: true, speed: 65, view: 1, screens: ['hazard', 'camera', 'settings', 'nav'] },
+                'landscape-camera': { distance: 180, severity: 8, type: 'ROUGH SURFACE', recording: true, speed: 70, view: 3, screens: ['hazard', 'camera', 'settings', 'nav'] },
+                'multiple-hazards': { distance: 250, severity: 8, type: 'DEBRIS ON ROAD', recording: true, speed: 75, view: 1, nextHazard: 550, screens: ['hazard', 'camera', 'settings', 'nav'] },
+                'manual-record': { distance: 0, severity: 1, type: 'POTHOLE AHEAD', recording: true, speed: 0, view: 1, screens: ['hazard', 'camera', 'settings', 'nav'] }
+            };
+
+            document.querySelectorAll('.scenario-preview').forEach(preview => {
+                const scenarioType = preview.getAttribute('data-scenario');
+                const config = scenarios[scenarioType];
+                if (!config) return;
+
+                const { distance, severity, type, recording, speed, view, nextHazard, arrow = '↑' } = config;
+
+                // Calculate background color
+                let bgColor = '#1976D2';
+                if (distance === 0) {
+                    bgColor = '#1976D2';
+                } else if (severity >= 8 && distance <= 500) {
+                    bgColor = '#D32F2F';
+                } else if (severity === 7 && distance <= 500) {
+                    bgColor = '#FF6F00';
+                } else if (severity >= 5 && severity <= 6 && distance <= 500) {
+                    bgColor = '#FBC02D';
+                } else if (severity >= 1 && severity <= 4 && distance <= 500) {
+                    bgColor = '#29B6F6';
+                }
+
+                const icon = hazardIcons[type] || '⚠️';
+
+                let content = '';
+                if (view === 1) {
+                    // HUD View
+                    content = distance === 0
+                        ? '<div class="all-clear">No Known Hazards ✓</div>'
+                        : `
+                            <div class="hazard-icon">${icon}</div>
+                            <div class="hazard-type">${type}</div>
+                            <div class="hazard-distance">${distance}<span style="font-size: 28px;">m</span></div>
+                            <div style="font-size: 42px;">${arrow}</div>
+                        `;
+                } else if (view === 2) {
+                    // HUD + PIP
+                    content = `
+                        <div class="hazard-icon">${icon}</div>
+                        <div class="hazard-type">${type}</div>
+                        <div class="hazard-distance">${distance}<span style="font-size: 28px;">m</span></div>
+                        <div style="position: absolute; bottom: 56px; right: 14px; width: 105px; height: 70px; background: #000; background-image: url('assets/images/road_view.jpg'); background-size: contain; background-position: center; background-repeat: no-repeat; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 14px; color: rgba(255,255,255,0.3); border: 2px solid rgba(255,255,255,0.3);"></div>
+                    `;
+                } else if (view === 3) {
+                    // Camera View
+                    content = `
+                        <div style="width: 100%; height: 100%; background: #000; background-image: url('assets/images/road_view.jpg'); background-size: contain; background-position: center; background-repeat: no-repeat; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.3); font-size: 16px;"></div>
+                        <div style="position: absolute; top: 70px; left: 50%; transform: translateX(-50%); background: ${bgColor}; color: white; padding: 14px 28px; border-radius: 14px; font-size: 14px; text-align: center;">
+                            <div style="font-weight: bold;">${type}</div>
+                            <div style="font-size: 25px; font-weight: 800;">${distance}m</div>
+                        </div>
+                    `;
+                }
+
+                const statusBar = `
+                    <div class="status-bar" style="color: white;">
+                        <div>
+                            ${recording ? '<span class="status-badge">REC</span>' : ''}
+                            <span class="status-badge">${speed > 0 ? 'MOVING' : 'STOPPED'}</span>
+                        </div>
+                        <div>
+                            <span class="status-badge">LANDSCAPE</span>
+                        </div>
+                    </div>
+                `;
+
+                const nextHazardIndicator = nextHazard
+                    ? `<div class="next-hazard-indicator">Next: ${nextHazard}m ↗</div>`
+                    : '';
+
+                preview.innerHTML = `
+                    <div class="scenario-preview-screen" style="background-color: ${bgColor}; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; position: relative;">
+                        ${statusBar}
+                        ${nextHazardIndicator}
+                        ${content}
+                    </div>
+                `;
+            });
+        }
+
+        // Render scenarios when Examples tab is opened
+        examplesTab.addEventListener('click', () => {
+            setTimeout(renderScenarioPreviews, 100);
+        });
+
+        // Examples orientation toggle
+        const examplesPortraitBtn = document.getElementById('examplesPortraitBtn');
+        const examplesLandscapeBtn = document.getElementById('examplesLandscapeBtn');
+        const examplesBothBtn = document.getElementById('examplesBothBtn');
+
+        let examplesOrientationMode = 'portrait'; // 'portrait', 'landscape', 'both'
+
+        function updateExamplesOrientation(mode) {
+            examplesOrientationMode = mode;
+
+            // Update button states
+            examplesPortraitBtn.classList.remove('active');
+            examplesLandscapeBtn.classList.remove('active');
+            examplesBothBtn.classList.remove('active');
+
+            const allScenarioItems = document.querySelectorAll('.scenario-item');
+            const allPortraitPreviews = document.querySelectorAll('.scenario-preview:not(.landscape)');
+            const allLandscapePreviews = document.querySelectorAll('.scenario-preview.landscape');
+
+            if (mode === 'portrait') {
+                examplesPortraitBtn.classList.add('active');
+                allScenarioItems.forEach(item => item.classList.remove('show-both'));
+                allPortraitPreviews.forEach(preview => preview.style.display = 'block');
+                allLandscapePreviews.forEach(preview => preview.style.display = 'none');
+            } else if (mode === 'landscape') {
+                examplesLandscapeBtn.classList.add('active');
+                allScenarioItems.forEach(item => item.classList.remove('show-both'));
+                allPortraitPreviews.forEach(preview => preview.style.display = 'none');
+                allLandscapePreviews.forEach(preview => preview.style.display = 'block');
+            } else if (mode === 'both') {
+                examplesBothBtn.classList.add('active');
+                allScenarioItems.forEach(item => item.classList.add('show-both'));
+                allPortraitPreviews.forEach(preview => preview.style.display = 'block');
+                allLandscapePreviews.forEach(preview => preview.style.display = 'block');
+            }
+
+            // Re-render to ensure both previews are populated
+            renderScenarioPreviews();
+        }
+
+        examplesPortraitBtn.addEventListener('click', () => updateExamplesOrientation('portrait'));
+        examplesLandscapeBtn.addEventListener('click', () => updateExamplesOrientation('landscape'));
+        examplesBothBtn.addEventListener('click', () => updateExamplesOrientation('both'));
+
+        // "Try It" button functionality
+        function applyScenario(scenarioType) {
+            const scenarios = {
+                'critical': { distance: 150, severity: 10, type: 'POTHOLE AHEAD', recording: true, speed: 80, view: 1, moving: true, orientation: 'portrait' },
+                'rough-road': { distance: 300, severity: 8, type: 'ROUGH SURFACE', recording: true, speed: 65, view: 1, moving: true, orientation: 'portrait' },
+                'moderate': { distance: 500, severity: 6, type: 'DEBRIS ON ROAD', recording: true, speed: 60, view: 1, moving: true, orientation: 'portrait' },
+                'minor': { distance: 450, severity: 3, type: 'SHARP TURN', recording: true, speed: 70, view: 1, moving: true, orientation: 'portrait' },
+                'all-clear': { distance: 0, severity: 1, type: 'POTHOLE AHEAD', recording: true, speed: 75, view: 1, moving: true, orientation: 'portrait' },
+                'stationary': { distance: 0, severity: 1, type: 'POTHOLE AHEAD', recording: false, speed: 0, view: 1, moving: false, orientation: 'portrait' },
+                'camera-overlay': { distance: 200, severity: 9, type: 'ACCIDENT ZONE', recording: true, speed: 70, view: 3, moving: true, orientation: 'portrait' },
+                'pip-view': { distance: 400, severity: 7, type: 'ROUGH SURFACE', recording: true, speed: 60, view: 2, moving: true, orientation: 'portrait' },
+                'landscape-critical': { distance: 250, severity: 9, type: 'POTHOLE AHEAD', recording: true, speed: 65, view: 1, moving: true, orientation: 'landscape' },
+                'landscape-camera': { distance: 180, severity: 8, type: 'ROUGH SURFACE', recording: true, speed: 70, view: 3, moving: true, orientation: 'landscape' },
+                'multiple-hazards': { distance: 250, severity: 8, type: 'DEBRIS ON ROAD', recording: true, speed: 75, view: 1, moving: true, orientation: 'portrait', nextHazard: 550 },
+                'manual-record': { distance: 0, severity: 1, type: 'POTHOLE AHEAD', recording: true, speed: 0, view: 1, moving: false, orientation: 'portrait', autoRecord: false }
+            };
+
+            const config = scenarios[scenarioType];
+            if (!config) return;
+
+            // Save scroll position before switching tabs
+            examplesScrollPosition = examplesContent.scrollTop;
+
+            // Apply state
+            state.distance = config.distance;
+            state.severity = config.severity;
+            state.hazardType = config.type;
+            state.recording = config.recording;
+            state.speed = config.speed;
+            state.currentPage = config.view;
+            state.moving = config.moving;
+            state.orientation = config.orientation;
+
+            if (config.autoRecord !== undefined) {
+                state.autoRecord = config.autoRecord;
+            } else {
+                state.autoRecord = true;
+            }
+
+            if (config.nextHazard) {
+                state.nextDistance = config.nextHazard;
+            }
+
+            // Update all UI controls
+            distanceSlider.value = config.distance;
+            distanceValue.textContent = config.distance;
+
+            severitySlider.value = config.severity;
+            severityValue.textContent = config.severity;
+
+            speedSlider.value = config.speed;
+            speedValue.textContent = config.speed;
+
+            hazardTypeSelect.value = config.type;
+
+            autoRecordToggle.classList.toggle('active', state.autoRecord);
+            autoRecordToggle.textContent = state.autoRecord ? 'ON' : 'OFF';
+
+            manualRecordToggle.classList.toggle('active', config.recording);
+            stopRecordButton.classList.toggle('active', !config.recording);
+
+            motionToggle.classList.toggle('active', config.moving);
+            motionToggle.textContent = config.moving ? 'MOVING' : 'STOPPED';
+
+            // Apply orientation
+            if (config.orientation === 'landscape') {
+                landscapeButton.classList.add('active');
+                portraitButton.classList.remove('active');
+                mainContentDiv.classList.add('landscape-mode');
+                statusOrientation.textContent = 'LANDSCAPE';
+            } else {
+                portraitButton.classList.add('active');
+                landscapeButton.classList.remove('active');
+                mainContentDiv.classList.remove('landscape-mode');
+                statusOrientation.textContent = 'PORTRAIT';
+            }
+
+            // Update displays
+            updateHazardDisplay();
+            updateNextHazard();
+            updateSpeed();
+            updateRecording();
+            updateMotion();
+            switchPage(config.view);
+
+            // Switch to Controls tab
+            controlsTab.click();
+        }
+
+        // Add event listeners to all "Try It" buttons
+        document.querySelectorAll('.try-it-button').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const scenarioType = e.target.getAttribute('data-scenario');
+                applyScenario(scenarioType);
+            });
+        });
+    </script>
+</body>
+</html>

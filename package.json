@@ -1,0 +1,16 @@
+{
+  "name": "terrainiq-mqtt-broker",
+  "version": "1.0.0",
+  "description": "MQTT broker for TerrainIQ Dashcam HTML Simulator integration",
+  "main": "mqtt_broker.js",
+  "scripts": {
+    "broker": "node mqtt_broker.js",
+    "start": "./start_simulator.sh"
+  },
+  "dependencies": {
+    "aedes": "^0.51.0",
+    "websocket-stream": "^5.5.2"
+  },
+  "author": "TerrainIQ",
+  "license": "MIT"
+}

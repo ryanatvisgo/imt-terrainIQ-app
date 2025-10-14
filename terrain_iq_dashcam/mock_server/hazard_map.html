@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Hazard Map - TerrainIQ</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+    .header {
+      position: absolute;
+      top: 10px;
+      left: 50px;
+      z-index: 1000;
+      background: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    .header h1 {
+      margin: 0 0 5px 0;
+      font-size: 20px;
+      color: #1E88E5;
+    }
+    .header p {
+      margin: 0;
+      font-size: 12px;
+      color: #666;
+    }
+    .controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      max-width: 250px;
+    }
+    .controls h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: #1E88E5;
+    }
+    .btn {
+      display: inline-block;
+      padding: 8px 16px;
+      background: #1E88E5;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      margin: 5px 5px 5px 0;
+      text-decoration: none;
+    }
+    .btn:hover {
+      background: #1976D2;
+    }
+    .btn-danger {
+      background: #f44336;
+    }
+    .btn-danger:hover {
+      background: #d32f2f;
+    }
+    .legend {
+      background: white;
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+      font-size: 12px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin: 5px 0;
+    }
+    .legend-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      margin-right: 8px;
+      border: 2px solid rgba(0,0,0,0.3);
+    }
+    .context-menu {
+      position: absolute;
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+      padding: 8px 0;
+      min-width: 180px;
+      z-index: 10000;
+      display: none;
+    }
+    .context-menu-item {
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .context-menu-item:hover {
+      background: #f5f5f5;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 10001;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+    }
+    .modal-content {
+      background: white;
+      margin: 10% auto;
+      padding: 25px;
+      border-radius: 8px;
+      max-width: 400px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .modal-content h2 {
+      margin: 0 0 20px 0;
+      color: #1E88E5;
+      font-size: 20px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      font-size: 13px;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+      box-sizing: border-box;
+    }
+    .form-group textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+    .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .close {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+      line-height: 20px;
+    }
+    .close:hover {
+      color: #000;
+    }
+    .stats {
+      background: white;
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+      font-size: 12px;
+    }
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 5px 0;
+    }
+    .stat-label {
+      color: #666;
+    }
+    .stat-value {
+      font-weight: bold;
+      color: #1E88E5;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🗺️ Hazard Map</h1>
+    <p>Right-click to add hazards • Click hazards to view/delete</p>
+  </div>
+
+  <div class="controls">
+    <h3>Controls</h3>
+    <a href="/" class="btn">← Home</a>
+    <button class="btn" onclick="refreshHazards()">🔄 Refresh</button>
+
+    <div class="legend">
+      <h4 style="margin: 0 0 8px 0; font-size: 13px;">Severity</h4>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #4CAF50;"></div>
+        <span>Low (1-4)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #FFC107;"></div>
+        <span>Medium (5-7)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #FF9800;"></div>
+        <span>High (8-9)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #F44336;"></div>
+        <span>Critical (10)</span>
+      </div>
+    </div>
+
+    <div class="stats" id="stats">
+      <div class="stat-row">
+        <span class="stat-label">Total Hazards:</span>
+        <span class="stat-value" id="stat-total">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Custom:</span>
+        <span class="stat-value" id="stat-custom">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Mock:</span>
+        <span class="stat-value" id="stat-mock">0</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- Context Menu -->
+  <div id="contextMenu" class="context-menu">
+    <div class="context-menu-item" onclick="addHazardAtLocation()">
+      ➕ Add Hazard Here
+    </div>
+  </div>
+
+  <!-- Add Hazard Modal -->
+  <div id="addHazardModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeAddHazardModal()">&times;</span>
+      <h2>Add New Hazard</h2>
+      <div class="form-group">
+        <label>Latitude:</label>
+        <input type="text" id="hazard-lat" readonly>
+      </div>
+      <div class="form-group">
+        <label>Longitude:</label>
+        <input type="text" id="hazard-lon" readonly>
+      </div>
+      <div class="form-group">
+        <label>Severity (1-10):</label>
+        <input type="number" id="hazard-severity" min="1" max="10" value="5">
+      </div>
+      <div class="form-group">
+        <label>Zone Radius (meters):</label>
+        <input type="number" id="hazard-zone" min="10" max="200" value="50">
+      </div>
+      <div class="form-group">
+        <label>Hazard Type:</label>
+        <select id="hazard-type">
+          <option value="custom hazard">Custom Hazard</option>
+          <option value="potholes">Potholes</option>
+          <option value="washboard">Washboard</option>
+          <option value="bumps">Bumps</option>
+          <option value="rough terrain">Rough Terrain</option>
+          <option value="water on road">Water on Road</option>
+          <option value="sluff off">Sluff Off</option>
+          <option value="object on road">Object on Road</option>
+          <option value="high risk area">High Risk Area</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Notes (optional):</label>
+        <textarea id="hazard-notes" placeholder="Additional details about this hazard..."></textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn" style="background: #666;" onclick="closeAddHazardModal()">Cancel</button>
+        <button class="btn" onclick="submitHazard()">Add Hazard</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Hazard Modal -->
+  <div id="viewHazardModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeViewHazardModal()">&times;</span>
+      <h2>Hazard Details</h2>
+      <div id="hazard-details"></div>
+      <div class="form-actions">
+        <button class="btn btn-danger" id="delete-hazard-btn" onclick="deleteCurrentHazard()">Delete</button>
+        <button class="btn" onclick="closeViewHazardModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Initialize map centered on test location
+    const map = L.map('map').setView([49.820725, -119.492921], 15);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    let hazards = [];
+    let currentContextMenuLocation = null;
+    let currentSelectedHazard = null;
+
+    // Function to get severity color
+    function getSeverityColor(severity) {
+      if (severity >= 10) return '#F44336'; // Red - Critical
+      if (severity >= 8) return '#FF9800';  // Orange - High
+      if (severity >= 5) return '#FFC107';  // Yellow - Medium
+      return '#4CAF50';                     // Green - Low
+    }
+
+    // Load and display hazards
+    function loadHazards() {
+      fetch('/all_hazards')
+        .then(res => res.json())
+        .then(data => {
+          hazards = data.hazards;
+          displayHazards();
+          updateStats();
+        })
+        .catch(err => console.error('Error loading hazards:', err));
+    }
+
+    function displayHazards() {
+      // Clear existing hazard layers
+      map.eachLayer(layer => {
+        if (layer instanceof L.Circle) {
+          map.removeLayer(layer);
+        }
+      });
+
+      // Add each hazard as a circle
+      hazards.forEach(hazard => {
+        const color = getSeverityColor(hazard.severity);
+        const circle = L.circle([hazard.lat, hazard.lon], {
+          color: color,
+          fillColor: color,
+          fillOpacity: 0.4,
+          radius: hazard.zone_m || 50
+        }).addTo(map);
+
+        // Popup with hazard info
+        const labels = hazard.labels ? hazard.labels.join(', ') : 'No labels';
+        const isCustom = hazard.id && !hazard.id.startsWith('mock-');
+        const hazardType = isCustom ? 'Custom' : 'Mock';
+
+        circle.bindPopup(`
+          <b>Severity: ${hazard.severity}/10</b><br>
+          Type: ${hazardType}<br>
+          Labels: ${labels}<br>
+          Zone: ${hazard.zone_m}m<br>
+          <button onclick="viewHazardDetails('${hazard.id}')" style="margin-top: 8px; padding: 6px 12px; background: #1E88E5; color: white; border: none; border-radius: 4px; cursor: pointer;">View Details</button>
+        `);
+
+        // Store hazard reference
+        circle.hazardId = hazard.id;
+      });
+    }
+
+    function updateStats() {
+      const customCount = hazards.filter(h => h.id && !h.id.startsWith('mock-')).length;
+      const mockCount = hazards.filter(h => h.id && h.id.startsWith('mock-')).length;
+
+      document.getElementById('stat-total').textContent = hazards.length;
+      document.getElementById('stat-custom').textContent = customCount;
+      document.getElementById('stat-mock').textContent = mockCount;
+    }
+
+    function refreshHazards() {
+      loadHazards();
+    }
+
+    // Right-click context menu
+    map.on('contextmenu', function(e) {
+      currentContextMenuLocation = e.latlng;
+      const menu = document.getElementById('contextMenu');
+      menu.style.display = 'block';
+      menu.style.left = e.originalEvent.pageX + 'px';
+      menu.style.top = e.originalEvent.pageY + 'px';
+    });
+
+    // Close context menu on click elsewhere
+    document.addEventListener('click', function() {
+      document.getElementById('contextMenu').style.display = 'none';
+    });
+
+    function addHazardAtLocation() {
+      if (!currentContextMenuLocation) return;
+
+      document.getElementById('hazard-lat').value = currentContextMenuLocation.lat.toFixed(6);
+      document.getElementById('hazard-lon').value = currentContextMenuLocation.lng.toFixed(6);
+      document.getElementById('addHazardModal').style.display = 'block';
+    }
+
+    function closeAddHazardModal() {
+      document.getElementById('addHazardModal').style.display = 'none';
+    }
+
+    function submitHazard() {
+      const lat = parseFloat(document.getElementById('hazard-lat').value);
+      const lon = parseFloat(document.getElementById('hazard-lon').value);
+      const severity = parseInt(document.getElementById('hazard-severity').value);
+      const zone_m = parseInt(document.getElementById('hazard-zone').value);
+      const type = document.getElementById('hazard-type').value;
+      const notes = document.getElementById('hazard-notes').value;
+
+      fetch('/add_hazard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lat,
+          lon,
+          severity,
+          zone_m,
+          labels: [type],
+          notes
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          closeAddHazardModal();
+          loadHazards();
+          alert('Hazard added successfully!');
+        } else {
+          alert('Error adding hazard: ' + data.error);
+        }
+      })
+      .catch(err => {
+        console.error('Error:', err);
+        alert('Error adding hazard');
+      });
+    }
+
+    function viewHazardDetails(hazardId) {
+      const hazard = hazards.find(h => h.id === hazardId);
+      if (!hazard) return;
+
+      currentSelectedHazard = hazard;
+
+      const isCustom = !hazard.id.startsWith('mock-');
+      const labels = hazard.labels ? hazard.labels.join(', ') : 'No labels';
+      const notes = hazard.driver_notes && hazard.driver_notes.length > 0
+        ? hazard.driver_notes.map(n => `<li>${n.notes} <i>(${n.driver_name})</i></li>`).join('')
+        : '<li>No notes</li>';
+
+      document.getElementById('hazard-details').innerHTML = `
+        <div style="font-size: 13px;">
+          <p><b>Type:</b> ${isCustom ? 'Custom' : 'Mock (Built-in)'}</p>
+          <p><b>Location:</b> ${hazard.lat.toFixed(6)}, ${hazard.lon.toFixed(6)}</p>
+          <p><b>Severity:</b> ${hazard.severity}/10</p>
+          <p><b>Zone Radius:</b> ${hazard.zone_m}m</p>
+          <p><b>Labels:</b> ${labels}</p>
+          <p><b>Last Detected:</b> ${new Date(hazard.last_detected).toLocaleString()}</p>
+          <p><b>Times Detected (6 months):</b> ${hazard.times_detected_6mos}</p>
+          <p><b>Driver Notes:</b></p>
+          <ul style="margin: 5px 0 0 20px;">${notes}</ul>
+        </div>
+      `;
+
+      // Hide delete button for mock hazards
+      const deleteBtn = document.getElementById('delete-hazard-btn');
+      deleteBtn.style.display = isCustom ? 'inline-block' : 'none';
+
+      document.getElementById('viewHazardModal').style.display = 'block';
+    }
+
+    function closeViewHazardModal() {
+      document.getElementById('viewHazardModal').style.display = 'none';
+      currentSelectedHazard = null;
+    }
+
+    function deleteCurrentHazard() {
+      if (!currentSelectedHazard) return;
+
+      const isCustom = !currentSelectedHazard.id.startsWith('mock-');
+      if (!isCustom) {
+        alert('Cannot delete built-in mock hazards');
+        return;
+      }
+
+      if (!confirm('Are you sure you want to delete this hazard?')) {
+        return;
+      }
+
+      fetch(`/remove_hazard/${currentSelectedHazard.id}`, {
+        method: 'DELETE'
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          closeViewHazardModal();
+          loadHazards();
+          alert('Hazard deleted successfully!');
+        } else {
+          alert('Error deleting hazard: ' + data.error);
+        }
+      })
+      .catch(err => {
+        console.error('Error:', err);
+        alert('Error deleting hazard');
+      });
+    }
+
+    // Close modals on background click
+    window.onclick = function(event) {
+      const addModal = document.getElementById('addHazardModal');
+      const viewModal = document.getElementById('viewHazardModal');
+      if (event.target === addModal) {
+        closeAddHazardModal();
+      }
+      if (event.target === viewModal) {
+        closeViewHazardModal();
+      }
+    };
+
+    // Load hazards on page load
+    loadHazards();
+  </script>
+</body>
+</html>

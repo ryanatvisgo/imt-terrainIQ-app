@@ -1,0 +1,57 @@
+{
+  "board_info": {
+    "name": "TerrainIQ Dashcam Development",
+    "created": "2025-10-12",
+    "version": "2.0.0",
+    "system": "folder-based",
+    "description": "Road intelligence system providing real-time hazard warnings and dashcam recording"
+  },
+  "columns": {
+    "backlog": {
+      "name": "Backlog",
+      "description": "Tasks that need to be done",
+      "order": 1
+    },
+    "ready": {
+      "name": "Ready",
+      "description": "Tasks ready to be worked on",
+      "order": 2
+    },
+    "in_progress": {
+      "name": "In Progress",
+      "description": "Tasks currently being worked on",
+      "order": 3
+    },
+    "review": {
+      "name": "Review",
+      "description": "Tasks awaiting review/validation",
+      "order": 4
+    },
+    "done": {
+      "name": "Done",
+      "description": "Completed tasks",
+      "order": 5
+    }
+  },
+  "task_template": {
+    "id": "TASK-000",
+    "title": "",
+    "description": "",
+    "type": "feature|bug|test|docs|refactor",
+    "priority": "low|medium|high|critical",
+    "assignee": "agent|human|unassigned",
+    "use_case": "",
+    "test_data": {
+      "good_samples": [],
+      "bad_samples": []
+    },
+    "acceptance_criteria": [],
+    "validation_status": "pending|passed|failed",
+    "created_at": "",
+    "updated_at": "",
+    "completed_at": null,
+    "tags": [],
+    "notes": []
+  },
+  "next_task_number": 11
+}

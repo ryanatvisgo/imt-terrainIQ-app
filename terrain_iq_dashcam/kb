@@ -1,0 +1,8 @@
+#!/bin/bash
+# Kanban CLI activation script for TerrainIQ Dashcam
+# Usage: ./kb show, ./kb add, ./kb move TASK-001 ready, etc.
+
+# Activate virtual environment and run kanban CLI
+source venv/bin/activate
+python3 kanban/kanban.py "$@"
+deactivate

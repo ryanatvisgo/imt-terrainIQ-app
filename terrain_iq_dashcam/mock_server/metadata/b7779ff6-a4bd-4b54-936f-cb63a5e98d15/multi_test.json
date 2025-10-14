@@ -1,0 +1,29 @@
+{
+  "device": {
+    "model": "Test Device",
+    "os": "iOS 18.0",
+    "app_version": "1.0.0"
+  },
+  "video": {
+    "filename": "multi_test_1760223158387.mp4",
+    "timestamp": "2025-10-11T22:52:38.387Z",
+    "duration_seconds": 10,
+    "size_bytes": 102400,
+    "resolution": "1920x1080",
+    "fps": 30
+  },
+  "location": {
+    "start": {
+      "latitude": 37.7749,
+      "longitude": -122.4194,
+      "altitude": 100
+    },
+    "end": {
+      "latitude": 37.7751,
+      "longitude": -122.4192,
+      "altitude": 100.2
+    }
+  },
+  "session_id": "3e094cc3-84b2-46e6-a5fe-e67ccd4dbede",
+  "created_at": "2025-10-11T22:52:38.388Z"
+}

@@ -1,0 +1,23 @@
+{
+  "name": "terrainiq-dashcam-mock-server",
+  "version": "1.0.0",
+  "description": "Mock server for TerrainIQ Dashcam testing",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "dashcam",
+    "mock",
+    "server"
+  ],
+  "author": "TerrainIQ",
+  "license": "MIT",
+  "dependencies": {
+    "aedes": "^0.51.3",
+    "express": "^4.18.2",
+    "mqtt": "^5.14.1",
+    "multer": "^1.4.5-lts.1",
+    "ws": "^8.18.3"
+  }
+}

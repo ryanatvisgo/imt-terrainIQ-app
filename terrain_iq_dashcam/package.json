@@ -1,0 +1,25 @@
+{
+  "name": "terrainiq-kanban",
+  "version": "1.0.0",
+  "description": "Web-based Kanban board with AI integration for TerrainIQ Dashcam project",
+  "main": "kanban_server.js",
+  "scripts": {
+    "start": "node kanban_server.js",
+    "dev": "node kanban_server.js"
+  },
+  "keywords": [
+    "kanban",
+    "ai",
+    "claude",
+    "task-management"
+  ],
+  "author": "TerrainIQ Team",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.28.0",
+    "aedes": "^0.51.3",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "websocket-stream": "^5.5.2"
+  }
+}

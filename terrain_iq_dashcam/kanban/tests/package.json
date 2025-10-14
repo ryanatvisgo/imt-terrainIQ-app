@@ -1,0 +1,23 @@
+{
+  "name": "kanban-ui-tests",
+  "version": "1.0.0",
+  "description": "Automated browser tests for Kanban UI",
+  "type": "module",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:ui": "npx playwright test --ui",
+    "test:headed": "npx playwright test --headed",
+    "test:debug": "npx playwright test --debug",
+    "report": "npx playwright show-report"
+  },
+  "keywords": [
+    "testing",
+    "playwright",
+    "kanban"
+  ],
+  "author": "TerrainIQ Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.56.0"
+  }
+}

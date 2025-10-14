@@ -1,0 +1,1760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TerrainIQ Kanban Board</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-yellow: #d29922;
+            --accent-orange: #db6d28;
+            --accent-red: #f85149;
+            --priority-critical: #f85149;
+            --priority-high: #db6d28;
+            --priority-medium: #d29922;
+            --priority-low: #3fb950;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: var(--bg-primary);
+            border-color: var(--accent-blue);
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: #000;
+            font-weight: 600;
+        }
+
+        .btn-primary:hover {
+            background: #79c0ff;
+            border-color: #79c0ff;
+        }
+
+        .btn-small {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+
+        /* Main Content */
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Kanban Board */
+        .board-container {
+            flex: 1;
+            overflow-x: auto;
+            padding: 20px;
+        }
+
+        .board {
+            display: flex;
+            gap: 16px;
+            min-height: 100%;
+        }
+
+        .column {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            min-width: 280px;
+            max-width: 280px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .column-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .column-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .task-count {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .column-content {
+            flex: 1;
+            padding: 12px;
+            overflow-y: auto;
+        }
+
+        .task-card {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .task-card:hover {
+            border-color: var(--accent-blue);
+            transform: translateY(-2px);
+        }
+
+        .task-card.selected {
+            border-color: var(--accent-blue);
+            background: var(--bg-primary);
+        }
+
+        .task-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .task-id {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .task-priority {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .priority-critical { background: var(--priority-critical); }
+        .priority-high { background: var(--priority-high); }
+        .priority-medium { background: var(--priority-medium); }
+        .priority-low { background: var(--priority-low); }
+
+        .task-title {
+            font-size: 14px;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .task-meta {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .task-badge {
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+        }
+
+        .badge-feature { border-left: 2px solid #58a6ff; }
+        .badge-bug { border-left: 2px solid #f85149; }
+        .badge-docs { border-left: 2px solid #79c0ff; }
+        .badge-test { border-left: 2px solid #3fb950; }
+        .badge-refactor { border-left: 2px solid #bc8cff; }
+
+        /* Sidebar */
+        .sidebar {
+            width: 600px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar.collapsed {
+            width: 0;
+            border: none;
+        }
+
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sidebar-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 20px;
+            padding: 4px;
+        }
+
+        .close-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .sidebar-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .task-details-section {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .ai-section {
+            border-top: 2px solid var(--border-color);
+            background: var(--bg-tertiary);
+            height: 350px;
+            display: flex;
+            flex-direction: column;
+            transition: height 0.3s ease;
+        }
+
+        .ai-section.collapsed {
+            height: 44px;
+        }
+
+        .ai-section.collapsed .chat-messages,
+        .ai-section.collapsed .chat-input-container {
+            display: none;
+        }
+
+        .ai-section-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .ai-section-header:hover {
+            background: var(--bg-secondary);
+        }
+
+        .ai-toggle {
+            font-size: 12px;
+            color: var(--text-secondary);
+            transition: transform 0.3s ease;
+        }
+
+        .ai-section.collapsed .ai-toggle {
+            transform: rotate(-90deg);
+        }
+
+        /* Pop-out Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            width: 90vw;
+            max-width: 1200px;
+            height: 90vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .modal-content-left {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+            border-right: 1px solid var(--border-color);
+        }
+
+        .modal-content-right {
+            width: 400px;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-tertiary);
+        }
+
+        .modal-field {
+            margin-bottom: 24px;
+        }
+
+        .modal-field-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .modal-textarea {
+            width: 100%;
+            min-height: 150px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+        }
+
+        .modal-textarea:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .modal-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .popout-btn {
+            font-size: 11px;
+            color: var(--accent-blue);
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-left: 8px;
+        }
+
+        .popout-btn:hover {
+            background: var(--bg-primary);
+        }
+
+        /* Collapsible metadata section */
+        .metadata-section {
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+
+        .metadata-header {
+            padding: 10px 12px;
+            background: var(--bg-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            user-select: none;
+        }
+
+        .metadata-header:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .metadata-header-text {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .metadata-toggle {
+            font-size: 12px;
+            color: var(--text-secondary);
+            transition: transform 0.3s ease;
+        }
+
+        .metadata-section.collapsed .metadata-toggle {
+            transform: rotate(-90deg);
+        }
+
+        .metadata-content {
+            padding: 12px;
+            display: block;
+        }
+
+        .metadata-section.collapsed .metadata-content {
+            display: none;
+        }
+
+        .metadata-summary {
+            font-size: 12px;
+            color: var(--text-secondary);
+            padding-left: 4px;
+        }
+
+        /* Modal AI Assistant */
+        .modal-ai-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 13px;
+            font-weight: 600;
+            background: var(--bg-secondary);
+        }
+
+        .modal-chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .modal-chat-input-container {
+            padding: 12px;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+
+        .task-detail-section {
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .task-detail-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .detail-field {
+            margin-bottom: 16px;
+        }
+
+        .field-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .edit-toggle {
+            font-size: 11px;
+            color: var(--accent-blue);
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .edit-toggle:hover {
+            background: var(--bg-primary);
+        }
+
+        .field-value {
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+
+        .field-input,
+        .field-textarea,
+        .field-select {
+            width: 100%;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 8px 12px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .field-textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .field-input:focus,
+        .field-textarea:focus,
+        .field-select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .markdown-content {
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-primary);
+        }
+
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3 {
+            margin-top: 16px;
+            margin-bottom: 8px;
+        }
+
+        .markdown-content ul,
+        .markdown-content ol {
+            margin-left: 20px;
+        }
+
+        .markdown-content code {
+            background: var(--bg-primary);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 12px;
+        }
+
+        .markdown-content pre {
+            background: var(--bg-primary);
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+
+        /* AI Chat */
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .chat-message {
+            padding: 10px 12px;
+            border-radius: 6px;
+            max-width: 90%;
+            font-size: 13px;
+        }
+
+        .chat-message.user {
+            background: var(--accent-blue);
+            color: #000;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+
+        .chat-message.assistant {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            align-self: flex-start;
+        }
+
+        .chat-message.system {
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-style: italic;
+            align-self: center;
+            text-align: center;
+            padding: 6px 12px;
+        }
+
+        .chat-input-container {
+            padding: 12px;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+
+        .quick-prompts {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .quick-prompt-btn {
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        .quick-prompt-btn:hover {
+            border-color: var(--accent-blue);
+            color: var(--text-primary);
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: 8px;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 10px;
+            color: var(--text-primary);
+            font-size: 13px;
+            resize: none;
+            min-height: 36px;
+            max-height: 100px;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .send-btn {
+            padding: 8px 16px;
+            background: var(--accent-blue);
+            color: #000;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .send-btn:hover {
+            background: #79c0ff;
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 16px;
+        }
+
+        .tab {
+            padding: 8px 16px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+
+        .tab.active {
+            color: var(--accent-blue);
+            border-bottom-color: var(--accent-blue);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .criteria-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .criteria-item {
+            padding: 8px;
+            margin-bottom: 4px;
+            background: var(--bg-primary);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .criteria-checkbox {
+            width: 16px;
+            height: 16px;
+        }
+
+        .save-indicator {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--accent-green);
+            color: #000;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🎯 TerrainIQ Kanban Board</h1>
+            <div class="header-actions">
+                <button class="btn" onclick="refreshBoard()">🔄 Refresh</button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Kanban Board -->
+            <div class="board-container">
+                <div class="board" id="board"></div>
+            </div>
+
+            <!-- Sidebar (Task Detail + AI at bottom) -->
+            <div class="sidebar collapsed" id="sidebar">
+                <div class="sidebar-header">
+                    <div class="sidebar-title" id="sidebarTitle">Task Details</div>
+                    <button class="close-btn" onclick="closeSidebar()">×</button>
+                </div>
+                <div class="sidebar-content">
+                    <div class="task-details-section" id="taskDetails"></div>
+
+                    <!-- AI Assistant Section (Always at bottom) -->
+                    <div class="ai-section" id="aiSection">
+                        <div class="ai-section-header" onclick="toggleAISection()">
+                            <span>✨ AI Assistant</span>
+                            <span class="ai-toggle">▼</span>
+                        </div>
+                        <div class="chat-messages" id="chatMessages">
+                            <div class="chat-message system">
+                                💡 Ask me to help refine this task or suggest changes
+                            </div>
+                        </div>
+                        <div class="chat-input-container">
+                            <div class="quick-prompts">
+                                <button class="quick-prompt-btn" onclick="sendQuickPrompt('Break this down into subtasks')">
+                                    Break down
+                                </button>
+                                <button class="quick-prompt-btn" onclick="sendQuickPrompt('Suggest acceptance criteria')">
+                                    Suggest criteria
+                                </button>
+                                <button class="quick-prompt-btn" onclick="sendQuickPrompt('Identify dependencies')">
+                                    Dependencies
+                                </button>
+                                <button class="quick-prompt-btn" onclick="sendQuickPrompt('Implementation approach')">
+                                    Implementation
+                                </button>
+                            </div>
+                            <div class="chat-input-wrapper">
+                                <textarea class="chat-input"
+                                          id="chatInput"
+                                          placeholder="Ask about this task..."
+                                          onkeypress="handleChatKeypress(event)"></textarea>
+                                <button class="send-btn" onclick="sendMessage()" id="sendBtn">Send</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pop-out Modal -->
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModalIfBackdrop(event)">
+        <div class="modal-container" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="modalTitle">Edit Task</div>
+                <button class="close-btn" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-content" id="modalContent">
+                <!-- Modal content will be dynamically inserted here -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal()">Close</button>
+                <button class="btn btn-primary" onclick="saveModal()">💾 Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let boardData = {};
+        let selectedTask = null;
+        let conversationHistory = [];
+        let modalConversationHistory = [];
+        let editMode = {};
+
+        // Initialize
+        async function init() {
+            await loadBoard();
+        }
+
+        // Load board data
+        async function loadBoard() {
+            try {
+                const response = await fetch('http://localhost:3001/api/board');
+                boardData = await response.json();
+                renderBoard();
+            } catch (error) {
+                console.error('Error loading board:', error);
+                showError('Failed to load board. Make sure the server is running on port 3001.');
+            }
+        }
+
+        // Render board
+        function renderBoard() {
+            const board = document.getElementById('board');
+            const columns = ['backlog', 'ready', 'in_progress', 'review', 'done'];
+            const columnNames = {
+                backlog: 'Backlog',
+                ready: 'Ready',
+                in_progress: 'In Progress',
+                review: 'Review',
+                done: 'Done'
+            };
+
+            board.innerHTML = columns.map(col => {
+                const tasks = boardData[col] || [];
+                return `
+                    <div class="column">
+                        <div class="column-header">
+                            <div class="column-title">
+                                ${columnNames[col]}
+                                <span class="task-count">${tasks.length}</span>
+                            </div>
+                        </div>
+                        <div class="column-content" id="column-${col}">
+                            ${tasks.length === 0 ?
+                                '<div class="empty-state"><div class="empty-state-icon">📭</div><div>No tasks</div></div>' :
+                                tasks.map(task => renderTaskCard(task, col)).join('')
+                            }
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Render task card
+        function renderTaskCard(task, column) {
+            const isSelected = selectedTask && selectedTask.id === task.id;
+            return `
+                <div class="task-card ${isSelected ? 'selected' : ''}"
+                     onclick="selectTask('${task.id}', '${column}')">
+                    <div class="task-header">
+                        <span class="task-id">${task.id}</span>
+                        <div class="task-priority priority-${task.priority || 'medium'}"></div>
+                    </div>
+                    <div class="task-title">${escapeHtml(task.title)}</div>
+                    <div class="task-meta">
+                        <span class="task-badge badge-${task.type || 'feature'}">${task.type || 'feature'}</span>
+                        <span class="task-badge">${task.assignee || 'unassigned'}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Select task
+        async function selectTask(taskId, column) {
+            try {
+                const response = await fetch(`http://localhost:3001/api/task/${taskId}`);
+                const data = await response.json();
+                selectedTask = data.task;
+                selectedTask.column = data.column;
+                conversationHistory = [];
+                editMode = {};
+
+                showSidebar();
+                renderTaskDetails();
+                renderBoard();
+
+                // Clear chat
+                document.getElementById('chatMessages').innerHTML = `
+                    <div class="chat-message system">
+                        💡 Ask me to help refine this task or suggest changes
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading task:', error);
+                showError('Failed to load task details');
+            }
+        }
+
+        // Render task details with editable fields
+        function renderTaskDetails() {
+            document.getElementById('taskDetails').innerHTML = `
+                <div class="task-detail-section">
+                    <div class="detail-field">
+                        <div class="field-label">
+                            Title
+                            <span class="edit-toggle" onclick="toggleEdit('title')">
+                                ${editMode.title ? '💾 Save' : '✏️ Edit'}
+                            </span>
+                        </div>
+                        <div id="field-title">
+                            ${editMode.title ?
+                                `<input type="text" class="field-input" value="${escapeHtml(selectedTask.title)}" id="input-title" onblur="saveField('title')">` :
+                                `<div class="task-detail-title">${escapeHtml(selectedTask.title)}</div>`
+                            }
+                        </div>
+                    </div>
+
+                    <div class="detail-field">
+                        <div class="field-label">ID</div>
+                        <div class="field-value" style="font-family: monospace">${selectedTask.id}</div>
+                    </div>
+
+                    <!-- Collapsible Metadata Section -->
+                    <div class="metadata-section collapsed" id="metadataSection">
+                        <div class="metadata-header" onclick="toggleMetadata()">
+                            <div>
+                                <span class="metadata-header-text">Task Metadata</span>
+                                <span class="metadata-summary">${selectedTask.type || 'feature'} · ${selectedTask.priority || 'medium'} · ${selectedTask.assignee || 'unassigned'}</span>
+                            </div>
+                            <span class="metadata-toggle">▼</span>
+                        </div>
+                        <div class="metadata-content">
+                            <div class="detail-field">
+                                <div class="field-label">Type</div>
+                                <select class="field-select" onchange="saveField('type', this.value)">
+                                    <option value="feature" ${selectedTask.type === 'feature' ? 'selected' : ''}>Feature</option>
+                                    <option value="bug" ${selectedTask.type === 'bug' ? 'selected' : ''}>Bug</option>
+                                    <option value="docs" ${selectedTask.type === 'docs' ? 'selected' : ''}>Docs</option>
+                                    <option value="test" ${selectedTask.type === 'test' ? 'selected' : ''}>Test</option>
+                                    <option value="refactor" ${selectedTask.type === 'refactor' ? 'selected' : ''}>Refactor</option>
+                                </select>
+                            </div>
+
+                            <div class="detail-field">
+                                <div class="field-label">Priority</div>
+                                <select class="field-select" onchange="saveField('priority', this.value)">
+                                    <option value="low" ${selectedTask.priority === 'low' ? 'selected' : ''}>Low</option>
+                                    <option value="medium" ${selectedTask.priority === 'medium' ? 'selected' : ''}>Medium</option>
+                                    <option value="high" ${selectedTask.priority === 'high' ? 'selected' : ''}>High</option>
+                                    <option value="critical" ${selectedTask.priority === 'critical' ? 'selected' : ''}>Critical</option>
+                                </select>
+                            </div>
+
+                            <div class="detail-field">
+                                <div class="field-label">Assignee</div>
+                                <select class="field-select" onchange="saveField('assignee', this.value)">
+                                    <option value="agent" ${selectedTask.assignee === 'agent' ? 'selected' : ''}>Agent</option>
+                                    <option value="human" ${selectedTask.assignee === 'human' ? 'selected' : ''}>Human</option>
+                                    <option value="unassigned" ${selectedTask.assignee === 'unassigned' ? 'selected' : ''}>Unassigned</option>
+                                </select>
+                            </div>
+
+                            <div class="detail-field">
+                                <div class="field-label">Status</div>
+                                <div class="field-value">${selectedTask.column}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTab('description')">Description</button>
+                    <button class="tab" onclick="switchTab('criteria')">Acceptance Criteria</button>
+                    <button class="tab" onclick="switchTab('subtasks')">Subtasks</button>
+                    <button class="tab" onclick="switchTab('notes')">Notes</button>
+                </div>
+
+                <div class="tab-content active" id="tab-description">
+                    <div class="detail-field">
+                        <div class="field-label">
+                            Description
+                            <span class="edit-toggle" onclick="toggleEdit('description')">
+                                ${editMode.description ? '💾 Save' : '✏️ Edit'}
+                            </span>
+                            <span class="popout-btn" onclick="openModal()">⤢ Pop Out</span>
+                        </div>
+                        <div id="field-description">
+                            ${editMode.description ?
+                                `<textarea class="field-textarea" id="input-description" onblur="saveField('description')">${escapeHtml(selectedTask.description || '')}</textarea>` :
+                                `<div class="markdown-content">${marked.parse(selectedTask.description || 'No description')}</div>`
+                            }
+                        </div>
+                    </div>
+
+                    ${selectedTask.use_case ? `
+                        <div class="detail-field" style="margin-top: 24px;">
+                            <div class="field-label">
+                                Use Case
+                                <span class="edit-toggle" onclick="toggleEdit('use_case')">
+                                    ${editMode.use_case ? '💾 Save' : '✏️ Edit'}
+                                </span>
+                            </div>
+                            <div id="field-use_case">
+                                ${editMode.use_case ?
+                                    `<textarea class="field-textarea" id="input-use_case" onblur="saveField('use_case')">${escapeHtml(selectedTask.use_case || '')}</textarea>` :
+                                    `<div class="markdown-content">${marked.parse(selectedTask.use_case)}</div>`
+                                }
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+
+                <div class="tab-content" id="tab-criteria">
+                    <div class="detail-field">
+                        <div class="field-label">
+                            Acceptance Criteria
+                            <span class="edit-toggle" onclick="toggleEdit('criteria')">
+                                ${editMode.criteria ? '💾 Save' : '✏️ Edit'}
+                            </span>
+                        </div>
+                        <div id="field-criteria">
+                            ${editMode.criteria ?
+                                `<textarea class="field-textarea" id="input-criteria" onblur="saveField('criteria')" placeholder="One criterion per line">${(selectedTask.acceptance_criteria || []).join('\n')}</textarea>` :
+                                (selectedTask.acceptance_criteria && selectedTask.acceptance_criteria.length > 0 ?
+                                    `<ul class="criteria-list">${selectedTask.acceptance_criteria.map(c => `<li class="criteria-item"><input type="checkbox" class="criteria-checkbox"> ${escapeHtml(c)}</li>`).join('')}</ul>` :
+                                    '<p style="color: var(--text-secondary);">No acceptance criteria defined</p>')
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="tab-subtasks">
+                    <div class="detail-field">
+                        <div class="field-label">
+                            Subtasks
+                            <span class="edit-toggle" onclick="addSubtask()">
+                                ➕ Add Subtask
+                            </span>
+                        </div>
+                        <div id="field-subtasks">
+                            ${selectedTask.subtasks && selectedTask.subtasks.length > 0 ?
+                                `<ul class="criteria-list" id="subtasks-list">
+                                    ${selectedTask.subtasks.map((s, idx) => `
+                                        <li class="criteria-item" style="display: flex; justify-content: space-between; align-items: center;">
+                                            <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+                                                <input type="checkbox"
+                                                       class="criteria-checkbox"
+                                                       ${s.completed ? 'checked' : ''}
+                                                       onchange="toggleSubtask(${idx})">
+                                                <span style="${s.completed ? 'text-decoration: line-through; opacity: 0.6;' : ''}">${escapeHtml(s.title)}</span>
+                                            </div>
+                                            <div style="display: flex; gap: 4px;">
+                                                <button class="btn-small" onclick="editSubtask(${idx})" style="padding: 2px 6px; font-size: 11px;">✏️</button>
+                                                <button class="btn-small" onclick="deleteSubtask(${idx})" style="padding: 2px 6px; font-size: 11px;">🗑️</button>
+                                            </div>
+                                        </li>
+                                    `).join('')}
+                                </ul>` :
+                                '<p style="color: var(--text-secondary);">No subtasks defined. Click "Add Subtask" to create one.</p>'
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="tab-notes">
+                    ${selectedTask.notes && selectedTask.notes.length > 0 ?
+                        `<ul>${selectedTask.notes.map(n => `<li style="margin-bottom: 8px;">${escapeHtml(n)}</li>`).join('')}</ul>` :
+                        '<p style="color: var(--text-secondary);">No notes yet</p>'
+                    }
+                </div>
+            `;
+        }
+
+        // Toggle edit mode
+        function toggleEdit(field) {
+            editMode[field] = !editMode[field];
+            renderTaskDetails();
+
+            // Focus the input if entering edit mode
+            if (editMode[field]) {
+                setTimeout(() => {
+                    const input = document.getElementById(`input-${field}`);
+                    if (input) input.focus();
+                }, 0);
+            }
+        }
+
+        // Save field
+        async function saveField(field, value) {
+            const input = document.getElementById(`input-${field}`);
+            const newValue = value !== undefined ? value : (input ? input.value : null);
+
+            if (newValue === null) return;
+
+            // Update local task
+            if (field === 'criteria') {
+                selectedTask.acceptance_criteria = newValue.split('\n').filter(l => l.trim());
+            } else {
+                selectedTask[field] = newValue;
+            }
+
+            // Save to server
+            try {
+                const response = await fetch(`http://localhost:3001/api/task/${selectedTask.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(selectedTask)
+                });
+
+                if (response.ok) {
+                    showSaveIndicator();
+                    editMode[field] = false;
+                    renderTaskDetails();
+                    await loadBoard(); // Refresh board to show updates
+                }
+            } catch (error) {
+                console.error('Error saving:', error);
+                showError('Failed to save changes');
+            }
+        }
+
+        // Show save indicator
+        function showSaveIndicator() {
+            const indicator = document.createElement('div');
+            indicator.className = 'save-indicator';
+            indicator.textContent = '✓ Saved';
+            document.body.appendChild(indicator);
+
+            setTimeout(() => {
+                indicator.remove();
+            }, 2000);
+        }
+
+        // Switch tab
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            event.target.classList.add('active');
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+        }
+
+        // Send quick prompt
+        function sendQuickPrompt(prompt) {
+            document.getElementById('chatInput').value = prompt;
+            sendMessage();
+        }
+
+        // Handle chat keypress
+        function handleChatKeypress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        // Send message to AI
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+
+            if (!message || !selectedTask) return;
+
+            // Add user message to chat
+            addChatMessage('user', message);
+            input.value = '';
+
+            // Show loading
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<div class="loading"></div>';
+
+            try {
+                const response = await fetch('http://localhost:3001/api/ai/enhance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        taskId: selectedTask.id,
+                        prompt: message,
+                        conversationHistory: conversationHistory
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'AI request failed');
+                }
+
+                const data = await response.json();
+                conversationHistory = data.conversationHistory;
+
+                // Add AI response to chat
+                addChatMessage('assistant', data.response);
+
+            } catch (error) {
+                console.error('AI error:', error);
+                addChatMessage('system', `Error: ${error.message}`);
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Send';
+            }
+        }
+
+        // Add chat message
+        function addChatMessage(role, content) {
+            const messagesDiv = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${role}`;
+
+            if (role === 'assistant') {
+                messageDiv.innerHTML = marked.parse(content);
+            } else {
+                messageDiv.textContent = content;
+            }
+
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // Show/hide sidebar
+        function showSidebar() {
+            document.getElementById('sidebar').classList.remove('collapsed');
+        }
+
+        function closeSidebar() {
+            document.getElementById('sidebar').classList.add('collapsed');
+            selectedTask = null;
+            conversationHistory = [];
+            renderBoard();
+        }
+
+        // Refresh board
+        async function refreshBoard() {
+            await loadBoard();
+            if (selectedTask) {
+                await selectTask(selectedTask.id, selectedTask.column);
+            }
+        }
+
+        // Show error
+        function showError(message) {
+            alert(message);
+        }
+
+        // Utility: Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Toggle AI section
+        function toggleAISection() {
+            const aiSection = document.getElementById('aiSection');
+            aiSection.classList.toggle('collapsed');
+        }
+
+        // Toggle metadata section
+        function toggleMetadata() {
+            const metadataSection = document.getElementById('metadataSection');
+            metadataSection.classList.toggle('collapsed');
+        }
+
+        // Open pop-out modal
+        function openModal() {
+            if (!selectedTask) return;
+
+            const modal = document.getElementById('modalOverlay');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalContent = document.getElementById('modalContent');
+
+            modalTitle.textContent = `Edit: ${selectedTask.title}`;
+            modalConversationHistory = [];
+
+            modalContent.innerHTML = `
+                <div class="modal-content-left">
+                    <div class="modal-field">
+                        <div class="modal-field-label">Description</div>
+                        <textarea class="modal-textarea" id="modal-description" style="min-height: 200px;">${escapeHtml(selectedTask.description || '')}</textarea>
+                    </div>
+
+                    <div class="modal-field">
+                        <div class="modal-field-label">Use Case</div>
+                        <textarea class="modal-textarea" id="modal-use-case">${escapeHtml(selectedTask.use_case || '')}</textarea>
+                    </div>
+
+                    <div class="modal-field">
+                        <div class="modal-field-label">Acceptance Criteria</div>
+                        <textarea class="modal-textarea" id="modal-criteria" placeholder="One criterion per line">${(selectedTask.acceptance_criteria || []).join('\n')}</textarea>
+                    </div>
+
+                    <div class="modal-field">
+                        <div class="modal-field-label">Notes</div>
+                        <textarea class="modal-textarea" id="modal-notes" placeholder="One note per line">${(selectedTask.notes || []).join('\n')}</textarea>
+                    </div>
+
+                    <div class="modal-field">
+                        <div class="modal-field-label">
+                            Subtasks
+                            <span class="edit-toggle" onclick="addModalSubtask()" style="margin-left: 8px;">
+                                ➕ Add Subtask
+                            </span>
+                        </div>
+                        <div id="modal-subtasks-container">
+                            ${selectedTask.subtasks && selectedTask.subtasks.length > 0 ?
+                                selectedTask.subtasks.map((s, idx) => `
+                                    <div class="criteria-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                        <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+                                            <input type="checkbox"
+                                                   class="criteria-checkbox"
+                                                   ${s.completed ? 'checked' : ''}
+                                                   data-subtask-index="${idx}">
+                                            <input type="text"
+                                                   class="field-input"
+                                                   value="${escapeHtml(s.title)}"
+                                                   data-subtask-index="${idx}"
+                                                   style="flex: 1; padding: 4px 8px; font-size: 13px;">
+                                        </div>
+                                        <button class="btn-small" onclick="deleteModalSubtask(${idx})" style="padding: 2px 6px; font-size: 11px;">🗑️</button>
+                                    </div>
+                                `).join('') :
+                                '<p style="color: var(--text-secondary); font-size: 13px;">No subtasks defined</p>'
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-content-right">
+                    <div class="modal-ai-header">✨ AI Assistant</div>
+                    <div class="modal-chat-messages" id="modalChatMessages">
+                        <div class="chat-message system">
+                            💡 Ask me to help refine this task or suggest changes
+                        </div>
+                    </div>
+                    <div class="modal-chat-input-container">
+                        <div class="quick-prompts">
+                            <button class="quick-prompt-btn" onclick="sendModalQuickPrompt('Break this down into subtasks')">
+                                Break down
+                            </button>
+                            <button class="quick-prompt-btn" onclick="sendModalQuickPrompt('Suggest acceptance criteria')">
+                                Suggest criteria
+                            </button>
+                            <button class="quick-prompt-btn" onclick="sendModalQuickPrompt('Identify dependencies')">
+                                Dependencies
+                            </button>
+                            <button class="quick-prompt-btn" onclick="sendModalQuickPrompt('Implementation approach')">
+                                Implementation
+                            </button>
+                        </div>
+                        <div class="chat-input-wrapper">
+                            <textarea class="chat-input"
+                                      id="modalChatInput"
+                                      placeholder="Ask about this task..."
+                                      onkeypress="handleModalChatKeypress(event)"></textarea>
+                            <button class="send-btn" onclick="sendModalMessage()" id="modalSendBtn">Send</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            modal.classList.add('active');
+        }
+
+        // Close modal
+        function closeModal() {
+            const modal = document.getElementById('modalOverlay');
+            modal.classList.remove('active');
+        }
+
+        // Close modal if backdrop clicked
+        function closeModalIfBackdrop(event) {
+            if (event.target.id === 'modalOverlay') {
+                closeModal();
+            }
+        }
+
+        // Save changes from modal
+        async function saveModal() {
+            if (!selectedTask) return;
+
+            // Get values from modal
+            const description = document.getElementById('modal-description')?.value || '';
+            const useCase = document.getElementById('modal-use-case')?.value || '';
+            const criteriaText = document.getElementById('modal-criteria')?.value || '';
+            const notesText = document.getElementById('modal-notes')?.value || '';
+
+            // Collect subtasks from modal
+            const subtasks = [];
+            const subtaskContainer = document.getElementById('modal-subtasks-container');
+            if (subtaskContainer) {
+                const subtaskInputs = subtaskContainer.querySelectorAll('input[type="text"][data-subtask-index]');
+                const subtaskCheckboxes = subtaskContainer.querySelectorAll('input[type="checkbox"][data-subtask-index]');
+
+                subtaskInputs.forEach((input, idx) => {
+                    const title = input.value.trim();
+                    if (title) {
+                        subtasks.push({
+                            title: title,
+                            completed: subtaskCheckboxes[idx]?.checked || false
+                        });
+                    }
+                });
+            }
+
+            // Update task object
+            selectedTask.description = description;
+            selectedTask.use_case = useCase;
+            selectedTask.acceptance_criteria = criteriaText.split('\n').filter(l => l.trim());
+            selectedTask.notes = notesText.split('\n').filter(l => l.trim());
+            selectedTask.subtasks = subtasks;
+
+            // Save to server
+            try {
+                const response = await fetch(`http://localhost:3001/api/task/${selectedTask.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(selectedTask)
+                });
+
+                if (response.ok) {
+                    showSaveIndicator();
+                    closeModal();
+                    renderTaskDetails();
+                    await loadBoard();
+                }
+            } catch (error) {
+                console.error('Error saving from modal:', error);
+                showError('Failed to save changes from modal');
+            }
+        }
+
+        // Modal AI Assistant functions
+        function sendModalQuickPrompt(prompt) {
+            document.getElementById('modalChatInput').value = prompt;
+            sendModalMessage();
+        }
+
+        function handleModalChatKeypress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendModalMessage();
+            }
+        }
+
+        async function sendModalMessage() {
+            const input = document.getElementById('modalChatInput');
+            const message = input.value.trim();
+
+            if (!message || !selectedTask) return;
+
+            // Add user message to chat
+            addModalChatMessage('user', message);
+            input.value = '';
+
+            // Show loading
+            const sendBtn = document.getElementById('modalSendBtn');
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<div class="loading"></div>';
+
+            try {
+                const response = await fetch('http://localhost:3001/api/ai/enhance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        taskId: selectedTask.id,
+                        prompt: message,
+                        conversationHistory: modalConversationHistory
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'AI request failed');
+                }
+
+                const data = await response.json();
+                modalConversationHistory = data.conversationHistory;
+
+                // Add AI response to chat
+                addModalChatMessage('assistant', data.response);
+
+            } catch (error) {
+                console.error('Modal AI error:', error);
+                addModalChatMessage('system', `Error: ${error.message}`);
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Send';
+            }
+        }
+
+        function addModalChatMessage(role, content) {
+            const messagesDiv = document.getElementById('modalChatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${role}`;
+
+            if (role === 'assistant') {
+                messageDiv.innerHTML = marked.parse(content);
+            } else {
+                messageDiv.textContent = content;
+            }
+
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // Modal subtask management functions
+        function addModalSubtask() {
+            const container = document.getElementById('modal-subtasks-container');
+            if (!container) return;
+
+            const title = prompt('Enter subtask title:');
+            if (!title || !title.trim()) return;
+
+            // Remove "no subtasks" message if present
+            const noSubtasksMsg = container.querySelector('p');
+            if (noSubtasksMsg) {
+                noSubtasksMsg.remove();
+            }
+
+            // Get current subtask count
+            const currentSubtasks = container.querySelectorAll('.criteria-item');
+            const newIndex = currentSubtasks.length;
+
+            // Create new subtask HTML
+            const subtaskHtml = `
+                <div class="criteria-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+                        <input type="checkbox"
+                               class="criteria-checkbox"
+                               data-subtask-index="${newIndex}">
+                        <input type="text"
+                               class="field-input"
+                               value="${escapeHtml(title.trim())}"
+                               data-subtask-index="${newIndex}"
+                               style="flex: 1; padding: 4px 8px; font-size: 13px;">
+                    </div>
+                    <button class="btn-small" onclick="deleteModalSubtask(${newIndex})" style="padding: 2px 6px; font-size: 11px;">🗑️</button>
+                </div>
+            `;
+
+            container.insertAdjacentHTML('beforeend', subtaskHtml);
+        }
+
+        function deleteModalSubtask(index) {
+            if (!confirm('Delete this subtask?')) return;
+
+            const container = document.getElementById('modal-subtasks-container');
+            if (!container) return;
+
+            const subtaskItems = container.querySelectorAll('.criteria-item');
+            if (subtaskItems[index]) {
+                subtaskItems[index].remove();
+            }
+
+            // If no subtasks left, show message
+            const remainingSubtasks = container.querySelectorAll('.criteria-item');
+            if (remainingSubtasks.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary); font-size: 13px;">No subtasks defined</p>';
+            }
+        }
+
+        // Subtask management functions
+        async function addSubtask() {
+            if (!selectedTask) return;
+
+            const title = prompt('Enter subtask title:');
+            if (!title || !title.trim()) return;
+
+            if (!selectedTask.subtasks) {
+                selectedTask.subtasks = [];
+            }
+
+            selectedTask.subtasks.push({
+                title: title.trim(),
+                completed: false
+            });
+
+            await saveTaskToServer();
+            renderTaskDetails();
+        }
+
+        async function toggleSubtask(index) {
+            if (!selectedTask || !selectedTask.subtasks) return;
+
+            selectedTask.subtasks[index].completed = !selectedTask.subtasks[index].completed;
+
+            await saveTaskToServer();
+            renderTaskDetails();
+        }
+
+        async function editSubtask(index) {
+            if (!selectedTask || !selectedTask.subtasks) return;
+
+            const currentTitle = selectedTask.subtasks[index].title;
+            const newTitle = prompt('Edit subtask title:', currentTitle);
+
+            if (!newTitle || !newTitle.trim()) return;
+            if (newTitle.trim() === currentTitle) return;
+
+            selectedTask.subtasks[index].title = newTitle.trim();
+
+            await saveTaskToServer();
+            renderTaskDetails();
+        }
+
+        async function deleteSubtask(index) {
+            if (!selectedTask || !selectedTask.subtasks) return;
+
+            if (!confirm('Delete this subtask?')) return;
+
+            selectedTask.subtasks.splice(index, 1);
+
+            await saveTaskToServer();
+            renderTaskDetails();
+        }
+
+        async function saveTaskToServer() {
+            try {
+                const response = await fetch(`http://localhost:3001/api/task/${selectedTask.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(selectedTask)
+                });
+
+                if (response.ok) {
+                    showSaveIndicator();
+                    await loadBoard();
+                }
+            } catch (error) {
+                console.error('Error saving:', error);
+                showError('Failed to save changes');
+            }
+        }
+
+        // Initialize on load
+        init();
+    </script>
+</body>
+</html>

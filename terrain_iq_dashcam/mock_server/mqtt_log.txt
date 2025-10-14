@@ -1,0 +1,14 @@
+[2025-10-12T02:37:03.046Z] 📱 MQTT Client connected: mqttjs_4b33c921
+[2025-10-12T02:37:16.348Z] 📴 MQTT Client disconnected: mqttjs_4b33c921
+[2025-10-12T02:37:16.375Z] 📱 MQTT Client connected: mqttjs_8586b36a
+[2025-10-12T02:42:03.883Z] 📴 MQTT Client disconnected: mqttjs_8586b36a
+[2025-10-12T02:42:03.915Z] 📱 MQTT Client connected: mqttjs_cbb15839
+[2025-10-12T02:42:04.997Z] 📴 MQTT Client disconnected: mqttjs_cbb15839
+[2025-10-12T02:42:05.021Z] 📱 MQTT Client connected: mqttjs_6a24300d
+[2025-10-12T02:42:05.581Z] 📴 MQTT Client disconnected: mqttjs_6a24300d
+[2025-10-12T02:42:05.602Z] 📱 MQTT Client connected: mqttjs_6ff5252e
+[2025-10-12T02:42:06.045Z] 📴 MQTT Client disconnected: mqttjs_6ff5252e
+[2025-10-12T02:42:06.066Z] 📱 MQTT Client connected: mqttjs_6f797ff5
+[2025-10-12T02:49:37.743Z] 📴 MQTT Client disconnected: mqttjs_6f797ff5
+[2025-10-12T02:49:39.732Z] 📱 MQTT Client connected: mqttjs_6f797ff5
+[2025-10-12T02:56:20.802Z] 📴 MQTT Client disconnected: mqttjs_6f797ff5

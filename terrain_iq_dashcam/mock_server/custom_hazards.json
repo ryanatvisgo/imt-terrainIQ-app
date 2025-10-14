@@ -1,0 +1,15 @@
+[
+  {
+    "id": "1760241206154-692809501",
+    "lon": -119.497443,
+    "lat": 49.821933,
+    "zone_m": 50,
+    "last_detected": "2025-10-12T03:53:26.154Z",
+    "times_detected_6mos": 1,
+    "severity": 5,
+    "labels": [
+      "custom hazard"
+    ],
+    "driver_notes": []
+  }
+]

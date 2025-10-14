@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TerrainIQ Live Dashboard</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #0a0e1a;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    .container {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 350px;
+      background: #141824;
+      border-right: 1px solid #2a2f3f;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .header {
+      padding: 20px;
+      background: linear-gradient(135deg, #1E88E5 0%, #1565C0 100%);
+      border-bottom: 1px solid #2a2f3f;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .header p {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      padding: 15px 20px;
+      background: #1a1f2e;
+      border-bottom: 1px solid #2a2f3f;
+    }
+
+    .stat-box {
+      text-align: center;
+      padding: 10px;
+      background: #141824;
+      border-radius: 8px;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #1E88E5;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: #888;
+      margin-top: 4px;
+    }
+
+    .device-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+    }
+
+    .device-card {
+      background: #1a1f2e;
+      border: 2px solid #2a2f3f;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .device-card:hover {
+      border-color: #1E88E5;
+      transform: translateX(4px);
+    }
+
+    .device-card.selected {
+      border-color: #1E88E5;
+      background: #1E2835;
+    }
+
+    .device-card.offline {
+      opacity: 0.5;
+    }
+
+    .device-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .device-id {
+      font-weight: 600;
+      font-size: 14px;
+      color: #1E88E5;
+    }
+
+    .device-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 12px;
+      background: #0a0e1a;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4CAF50;
+      animation: pulse 2s infinite;
+    }
+
+    .status-dot.offline {
+      background: #666;
+      animation: none;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .device-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      font-size: 11px;
+    }
+
+    .info-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .info-icon {
+      font-size: 14px;
+    }
+
+    .proximity-alert {
+      margin-top: 10px;
+      padding: 8px;
+      background: rgba(255, 152, 0, 0.1);
+      border-left: 3px solid #FF9800;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+
+    .proximity-alert.danger {
+      background: rgba(244, 67, 54, 0.1);
+      border-left-color: #F44336;
+    }
+
+    /* Map */
+    .map-container {
+      flex: 1;
+      position: relative;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    .map-controls {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      display: flex;
+      gap: 10px;
+    }
+
+    .map-btn {
+      padding: 10px 16px;
+      background: #1E88E5;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .map-btn:hover {
+      background: #1976D2;
+    }
+
+    .legend {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(20, 24, 36, 0.95);
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      z-index: 1000;
+      font-size: 12px;
+    }
+
+    .legend-title {
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: #1E88E5;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .legend-marker {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+    }
+
+    .no-devices {
+      text-align: center;
+      padding: 60px 20px;
+      color: #666;
+    }
+
+    .no-devices-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #0a0e1a;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #2a2f3f;
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3a3f4f;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="header">
+        <h1>🚗 TerrainIQ Dashboard</h1>
+        <p>Real-time device monitoring</p>
+      </div>
+
+      <div class="stats">
+        <div class="stat-box">
+          <div class="stat-value" id="device-count">0</div>
+          <div class="stat-label">Active Devices</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="hazard-count">0</div>
+          <div class="stat-label">Nearby Hazards</div>
+        </div>
+      </div>
+
+      <div class="device-list" id="device-list">
+        <div class="no-devices">
+          <div class="no-devices-icon">📱</div>
+          <p>No devices connected</p>
+          <p style="font-size: 11px; margin-top: 8px; color: #888;">
+            Start the TerrainIQ app to see devices here
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Map -->
+    <div class="map-container">
+      <div class="map-controls">
+        <button class="map-btn" onclick="fitAllDevices()">🎯 Fit All</button>
+        <button class="map-btn" onclick="toggleHazards()">⚠️ Toggle Hazards</button>
+      </div>
+
+      <div id="map"></div>
+
+      <div class="legend">
+        <div class="legend-title">Legend</div>
+        <div class="legend-item">
+          <div class="legend-marker" style="background: #4CAF50;"></div>
+          <span>Device (Moving)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-marker" style="background: #2196F3;"></div>
+          <span>Device (Stopped)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-marker" style="background: #F44336;"></div>
+          <span>High Severity Hazard</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-marker" style="background: #FF9800;"></div>
+          <span>Medium Severity Hazard</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-marker" style="background: #FFC107;"></div>
+          <span>Low Severity Hazard</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Initialize map
+    const map = L.map('map').setView([37.7749, -122.4194], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Data structures
+    const devices = new Map();
+    const deviceMarkers = new Map();
+    const hazardMarkers = new Map();
+    let selectedDeviceIds = new Set();
+    let showHazards = true;
+
+    // MQTT Connection
+    const mqttClient = mqtt.connect('ws://localhost:8883');
+
+    mqttClient.on('connect', () => {
+      console.log('✅ Connected to MQTT broker');
+      mqttClient.subscribe('terrainiq/device/+/location');
+      mqttClient.subscribe('terrainiq/device/+/status');
+      mqttClient.subscribe('terrainiq/device/+/proximity');
+      mqttClient.subscribe('terrainiq/device/+/heartbeat');
+      mqttClient.subscribe('terrainiq/device/+/recording');
+    });
+
+    mqttClient.on('message', (topic, message) => {
+      const parts = topic.split('/');
+      const deviceId = parts[2];
+      const messageType = parts[3];
+
+      try {
+        const data = JSON.parse(message.toString());
+
+        if (!devices.has(deviceId)) {
+          devices.set(deviceId, { id: deviceId, lastUpdate: Date.now() });
+        }
+
+        const device = devices.get(deviceId);
+        device[messageType] = data;
+        device.lastUpdate = Date.now();
+
+        updateDeviceList();
+        updateMap();
+      } catch (e) {
+        console.error('Error parsing MQTT message:', e);
+      }
+    });
+
+    // Update device list
+    function updateDeviceList() {
+      const listEl = document.getElementById('device-list');
+      const deviceArray = Array.from(devices.values());
+
+      if (deviceArray.length === 0) {
+        listEl.innerHTML = `
+          <div class="no-devices">
+            <div class="no-devices-icon">📱</div>
+            <p>No devices connected</p>
+            <p style="font-size: 11px; margin-top: 8px; color: #888;">
+              Start the TerrainIQ app to see devices here
+            </p>
+          </div>
+        `;
+        document.getElementById('device-count').textContent = '0';
+        return;
+      }
+
+      const now = Date.now();
+      let html = '';
+      let activeCount = 0;
+
+      deviceArray.forEach(device => {
+        const isOnline = (now - device.lastUpdate) < 30000; // 30s timeout
+        if (isOnline) activeCount++;
+
+        const isSelected = selectedDeviceIds.has(device.id);
+        const location = device.location || {};
+        const status = device.status || {};
+        const proximity = device.proximity || {};
+        const heartbeat = device.heartbeat || {};
+
+        const hasProximityAlert = proximity.proximity_level && proximity.proximity_level !== 'safe';
+        const isDanger = proximity.distance_to_hazard !== undefined && proximity.distance_to_hazard < 100;
+
+        html += `
+          <div class="device-card ${isSelected ? 'selected' : ''} ${!isOnline ? 'offline' : ''}"
+               onclick="toggleDevice('${device.id}')">
+            <div class="device-header">
+              <div class="device-id">📱 ${device.id}</div>
+              <div class="device-status">
+                <div class="status-dot ${!isOnline ? 'offline' : ''}"></div>
+                <span>${isOnline ? 'Online' : 'Offline'}</span>
+              </div>
+            </div>
+            <div class="device-info">
+              <div class="info-item">
+                <span class="info-icon">📍</span>
+                <span>${location.lat ? location.lat.toFixed(4) + ', ' + location.lon.toFixed(4) : 'No GPS'}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-icon">${status.is_moving ? '🚗' : '⏸️'}</span>
+                <span>${status.is_moving ? 'Moving' : 'Stopped'}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-icon">🎥</span>
+                <span>${status.is_recording ? 'Recording' : 'Idle'}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-icon">📐</span>
+                <span>${status.orientation || 'unknown'}</span>
+              </div>
+              ${heartbeat.battery_level !== undefined ? `
+                <div class="info-item">
+                  <span class="info-icon">🔋</span>
+                  <span>${heartbeat.battery_level}%</span>
+                </div>
+              ` : ''}
+              ${location.speed !== undefined ? `
+                <div class="info-item">
+                  <span class="info-icon">⚡</span>
+                  <span>${(location.speed * 3.6).toFixed(1)} km/h</span>
+                </div>
+              ` : ''}
+            </div>
+            ${hasProximityAlert ? `
+              <div class="proximity-alert ${isDanger ? 'danger' : ''}">
+                <strong>⚠️ ${proximity.proximity_level}</strong><br>
+                ${proximity.distance_to_hazard}m to ${proximity.hazard_label} (severity: ${proximity.hazard_severity})
+              </div>
+            ` : ''}
+          </div>
+        `;
+      });
+
+      listEl.innerHTML = html;
+      document.getElementById('device-count').textContent = activeCount;
+    }
+
+    // Update map
+    function updateMap() {
+      // Update device markers
+      devices.forEach((device, deviceId) => {
+        if (!device.location || !device.location.lat) return;
+
+        const { lat, lon } = device.location;
+        const isMoving = device.status?.is_moving || false;
+        const isRecording = device.status?.is_recording || false;
+        const isSelected = selectedDeviceIds.has(deviceId);
+
+        const color = isMoving ? '#4CAF50' : '#2196F3';
+        const icon = L.divIcon({
+          className: 'custom-marker',
+          html: `
+            <div style="
+              background: ${color};
+              width: 24px;
+              height: 24px;
+              border-radius: 50%;
+              border: 3px solid ${isSelected ? '#FFD700' : '#fff'};
+              box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: white;
+              font-size: 12px;
+            ">
+              ${isRecording ? '🎥' : '📱'}
+            </div>
+          `,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        });
+
+        if (deviceMarkers.has(deviceId)) {
+          const marker = deviceMarkers.get(deviceId);
+          marker.setLatLng([lat, lon]);
+          marker.setIcon(icon);
+        } else {
+          const marker = L.marker([lat, lon], { icon })
+            .addTo(map)
+            .bindPopup(`
+              <b>Device: ${deviceId}</b><br>
+              Status: ${isMoving ? 'Moving' : 'Stopped'}<br>
+              Recording: ${isRecording ? 'Yes' : 'No'}
+            `);
+          deviceMarkers.set(deviceId, marker);
+        }
+
+        // Add proximity circle if there's a hazard warning
+        if (device.proximity?.distance_to_hazard !== undefined) {
+          const distance = device.proximity.distance_to_hazard;
+          const existingCircle = deviceMarkers.get(deviceId + '_circle');
+          if (existingCircle) {
+            existingCircle.setLatLng([lat, lon]);
+            existingCircle.setRadius(distance);
+          } else {
+            const circle = L.circle([lat, lon], {
+              radius: distance,
+              color: '#FF9800',
+              fillColor: '#FF9800',
+              fillOpacity: 0.1,
+              weight: 2,
+              dashArray: '5, 5'
+            }).addTo(map);
+            deviceMarkers.set(deviceId + '_circle', circle);
+          }
+        }
+      });
+
+      // Fetch and display hazards
+      if (showHazards && devices.size > 0) {
+        updateHazards();
+      }
+    }
+
+    // Fetch hazards for active devices
+    async function updateHazards() {
+      const device = Array.from(devices.values())[0];
+      if (!device || !device.location) return;
+
+      try {
+        const response = await fetch('http://localhost:3000/get_hazards', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lat: device.location.lat,
+            lon: device.location.lon,
+            radius_km: 1
+          })
+        });
+
+        const data = await response.json();
+        const hazards = data.hazards || [];
+
+        document.getElementById('hazard-count').textContent = hazards.length;
+
+        hazards.forEach((hazard, index) => {
+          const severity = hazard.severity;
+          let color = '#FFC107';
+          if (severity >= 8) color = '#F44336';
+          else if (severity >= 5) color = '#FF9800';
+
+          const icon = L.divIcon({
+            className: 'hazard-marker',
+            html: `
+              <div style="
+                background: ${color};
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                border: 2px solid #fff;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+              "></div>
+            `,
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+          });
+
+          const hazardId = 'hazard_' + index;
+          if (!hazardMarkers.has(hazardId)) {
+            const marker = L.marker([hazard.lat, hazard.lon], { icon })
+              .addTo(map)
+              .bindPopup(`
+                <b>⚠️ Hazard</b><br>
+                Type: ${hazard.labels[0]}<br>
+                Severity: ${hazard.severity}/10<br>
+                Zone: ${hazard.zone_m}m radius
+              `);
+
+            const circle = L.circle([hazard.lat, hazard.lon], {
+              radius: hazard.zone_m,
+              color: color,
+              fillColor: color,
+              fillOpacity: 0.1,
+              weight: 1
+            }).addTo(map);
+
+            hazardMarkers.set(hazardId, { marker, circle });
+          }
+        });
+      } catch (e) {
+        console.error('Error fetching hazards:', e);
+      }
+    }
+
+    // Toggle device selection
+    function toggleDevice(deviceId) {
+      if (selectedDeviceIds.has(deviceId)) {
+        selectedDeviceIds.delete(deviceId);
+      } else {
+        selectedDeviceIds.add(deviceId);
+      }
+      updateDeviceList();
+      updateMap();
+
+      // Zoom to selected devices
+      if (selectedDeviceIds.size > 0) {
+        const selectedDevices = Array.from(selectedDeviceIds)
+          .map(id => devices.get(id))
+          .filter(d => d && d.location);
+
+        if (selectedDevices.length > 0) {
+          const bounds = selectedDevices.map(d => [d.location.lat, d.location.lon]);
+          map.fitBounds(bounds, { padding: [50, 50] });
+        }
+      }
+    }
+
+    // Fit all devices on map
+    function fitAllDevices() {
+      const activeDevices = Array.from(devices.values()).filter(d => d.location);
+      if (activeDevices.length === 0) return;
+
+      const bounds = activeDevices.map(d => [d.location.lat, d.location.lon]);
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+
+    // Toggle hazard visibility
+    function toggleHazards() {
+      showHazards = !showHazards;
+      if (!showHazards) {
+        hazardMarkers.forEach(({ marker, circle }) => {
+          map.removeLayer(marker);
+          map.removeLayer(circle);
+        });
+        hazardMarkers.clear();
+      } else {
+        updateHazards();
+      }
+    }
+
+    // Auto-update every 5 seconds
+    setInterval(updateDeviceList, 5000);
+
+    // Remove stale devices
+    setInterval(() => {
+      const now = Date.now();
+      devices.forEach((device, deviceId) => {
+        if (now - device.lastUpdate > 60000) { // 1 minute timeout
+          devices.delete(deviceId);
+          const marker = deviceMarkers.get(deviceId);
+          if (marker) {
+            map.removeLayer(marker);
+            deviceMarkers.delete(deviceId);
+          }
+        }
+      });
+    }, 10000);
+  </script>
+</body>
+</html>
